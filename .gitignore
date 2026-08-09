@@ -1,0 +1,71 @@
+# =========================
+# IDE / Editor
+# =========================
+
+.vscode/
+.idea/
+
+# Obsidian local workspace state
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache/
+
+# =========================
+# Java / Maven
+# =========================
+
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven
+.mvn/timing.properties
+
+# =========================
+# Node / React
+# =========================
+
+node_modules/
+dist/
+build/
+coverage/
+
+# =========================
+# Environment / Secrets
+# =========================
+
+.env
+.env.*
+!.env.example
+
+# =========================
+# Logs
+# =========================
+
+*.log
+logs/
+
+# =========================
+# OS
+# =========================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Temporary files
+# =========================
+
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# =========================
+# Local data
+# =========================
+
+data/
