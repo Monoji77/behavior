@@ -46,7 +46,7 @@ Current target architecture:
 - PostgreSQL or TimescaleDB storage layer
 - Spring Boot analytics API
 - React dashboard
-- Git and GitLab for version control and DevOps workflow
+- Git and GitHub for version control and DevOps workflow
 
 Conceptual flow:
 
@@ -120,7 +120,7 @@ Windows responsibilities:
 - Run React frontend locally
 - Use PowerShell 7 as the main terminal
 - Use Git for local version control
-- Push to GitLab for remote repository and DevOps workflow
+- Push to GitHub for remote repository and DevOps workflow
 
 The iPhone will act only as a data producer. The Windows machine owns the data platform.
 
@@ -417,23 +417,23 @@ The backend should not directly perform heavy analytics. It should serve already
 
 ---
 
-## 16. DevOps Direction with Git and GitLab
+## 16. DevOps Direction with Git and GitHub
 
-Git and GitLab should be part of the project from the start.
+Git and GitHub should be part of the project from the start.
 
 Purpose:
 
 - Version control
 - Issue tracking
 - Branch workflow
-- Merge request practice
+- Pull request practice
 - CI pipeline practice
 - Environment variable management
 - Deployment planning
 - Documentation discipline
 - Release tracking
 
-The GitLab workflow should simulate a professional data engineering workflow.
+The GitHub workflow should simulate a professional data engineering workflow.
 
 Repository should contain:
 
@@ -446,12 +446,12 @@ Repository should contain:
 - Architecture notes
 - Operational runbooks
 
-GitLab should eventually manage:
+GitHub should eventually manage:
 
 - Issues
 - Milestones
-- Merge requests
-- CI checks
+- Pull requests
+- GitHub Actions checks
 - Build validation
 - Container image publishing
 - Environment-specific deployment notes
@@ -483,7 +483,7 @@ Suggested feature branch categories:
 - Sessionization
 - Live analytics
 - Frontend dashboard
-- GitLab CI
+- GitHub Actions CI
 - Observability
 - ML feature tables
 - Documentation
@@ -494,7 +494,7 @@ The point is to learn clean professional habits, not to create process overhead.
 
 ---
 
-## 18. GitLab CI/CD Direction
+## 18. GitHub Actions CI/CD Direction
 
 CI should be added incrementally.
 
@@ -521,7 +521,7 @@ Future CD possibilities:
 - Deploy to local development environment
 - Deploy to a small cloud VM
 - Deploy to a container platform
-- Publish container images to GitLab Container Registry
+- Publish container images to GitHub Container Registry
 - Promote releases across development, staging, and production-like environments
 
 CI/CD should support the project. It should not become the project too early.
@@ -545,7 +545,7 @@ Initial environment:
 Future environments:
 
 - Local development
-- GitLab CI test environment
+- GitHub Actions test environment
 - Cloud development environment
 - Staging-like environment
 - Optional production-like environment
@@ -709,14 +709,14 @@ Outcome:
 - Scope defined
 - Windows-first plan confirmed
 - Future macOS/Xcode route acknowledged
-- Git and GitLab DevOps plan included
+- Git and GitHub DevOps plan included
 
 ### Milestone 2 — Repository and Infrastructure Baseline
 
 Outcome:
 
 - Git repository initialized
-- GitLab repository created
+- GitHub repository created
 - Docker Compose baseline planned
 - Kafka and database architecture documented
 - Local development workflow documented
@@ -774,12 +774,12 @@ Outcome:
 - Dashboard shows time-series analytics
 - Dashboard shows latency information
 
-### Milestone 9 — GitLab CI
+### Milestone 9 — GitHub Actions CI
 
 Outcome:
 
 - Basic build checks exist
-- Merge requests are used
+- Pull requests are used
 - Pipeline status becomes part of workflow
 - Project resembles professional DevOps practice
 
@@ -833,7 +833,7 @@ Possible future engineering improvements:
 
 - TimescaleDB continuous aggregates
 - Kafka Streams or Flink
-- GitLab Container Registry
+- GitHub Container Registry
 - Cloud deployment
 - Observability dashboard
 - Alerting
@@ -859,7 +859,7 @@ The platform starts on Windows.
 
 Reason:
 
-Current development machine is Windows and should be sufficient for backend, Kafka, processor, database, frontend, and GitLab workflow.
+Current development machine is Windows and should be sufficient for backend, Kafka, processor, database, frontend, and GitHub workflow.
 
 Decision 3:
 
@@ -911,7 +911,7 @@ The iOS trigger timing is not fully controlled by the project.
 
 Decision 9:
 
-GitLab is included for DevOps practice.
+GitHub is included for DevOps practice.
 
 Reason:
 
@@ -938,8 +938,8 @@ Product questions:
 
 DevOps questions:
 
-- Should GitLab CI be added before or after the first working pipeline?
-- Should container images be published to GitLab Container Registry?
+- Should GitHub Actions CI be added before or after the first working pipeline?
+- Should container images be published to GitHub Container Registry?
 - Should deployment be local-only initially?
 - Should branch naming follow Jira-style task names or simple feature names?
 
@@ -960,9 +960,9 @@ Next planning actions:
 - Decide PostgreSQL versus TimescaleDB
 - Decide SSE versus WebSocket for live updates
 - Decide whether the first processor is plain Java, Kafka Streams, or Flink
-- Create GitLab repository
+- Create GitHub repository
 - Define initial Git branch strategy
-- Define first GitLab issues
+- Define first GitHub issues
 - Prepare local Windows development environment
 - Build infrastructure baseline
 - Then implement the ingestion path
@@ -991,7 +991,7 @@ Processors transform the stream.
 Databases store facts and analytics.  
 Backend serves access.  
 Frontend visualizes state.  
-GitLab manages workflow.  
+GitHub manages workflow.
 ML learns from clean time-series features.
 
 The long-term value is not the Instagram dashboard itself.
