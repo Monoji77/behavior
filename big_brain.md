@@ -1,5 +1,20 @@
 # Personal Usage Streaming Analytics — Project Brain
 
+## Current desired architecture
+
+```mermaid
+flowchart LR
+    I[iPhone Shortcut collector] -->|authenticated usage event| A[Spring Boot ingestion API]
+    A -->|raw app event| K[(Kafka: raw events topic)]
+    K --> P[Java stream processor]
+    P --> R[(TimescaleDB: raw events)]
+    P --> S[(TimescaleDB: sessions and time-series rollups)]
+    P --> L[Live metric updates]
+    S --> N[Spring Boot analytics API]
+    L --> N
+    N -->|SSE or WebSocket| D[React dashboard]
+```
+
 ## 1. Project Intent
 
 This project is a personal data engineering and full-stack streaming analytics project.
@@ -284,24 +299,24 @@ The project should first collect enough clean historical data before adding mode
 
 ## 11. Database Direction
 
-The first database can be PostgreSQL or TimescaleDB.
+The initial database is TimescaleDB, using PostgreSQL-compatible schemas.
 
-PostgreSQL is sufficient for the early project because the dataset is personal and small.
+TimescaleDB is the row-oriented operational database for the early project. It fits the live ingestion and time-series analytics requirements while preserving PostgreSQL compatibility.
 
-TimescaleDB is more aligned with the time-series analytics story because it is built around time-series workloads while remaining PostgreSQL-compatible.
+Initial storage responsibilities:
 
-Recommended direction:
+- Store raw events, sessions, and minute, hourly, and daily rollups
+- Serve low-latency dashboard and analytics queries
+- Support time-based retention and partitioning as the dataset grows
+- Keep the application database-access layer clean enough to avoid tight coupling to one database extension
 
-- Start with PostgreSQL-compatible schemas
-- Use TimescaleDB if the project should visibly emphasize time-series analytics
-- Keep the application code database-access layer clean enough to avoid tight coupling to one database extension
-- Do not introduce a data lake, warehouse, or distributed OLAP system too early
+Do not introduce a columnar warehouse, data lake, or distributed OLAP system in the initial build. The personal dataset and near-real-time workload do not require one.
 
 Future storage expansion:
 
-- PostgreSQL or TimescaleDB for local serving and analytics
-- Object storage for raw historical exports
-- Iceberg or warehouse layer only if the project grows beyond local learning scope
+- TimescaleDB remains the operational serving and analytics database
+- Object storage can hold raw historical exports
+- A columnar Iceberg or warehouse layer is an optional later addition for large-scale historical analytics or machine learning workloads
 
 ---
 
@@ -396,6 +411,22 @@ The backend has two roles:
 
 - Ingestion API
 - Analytics serving API
+
+### Ingestion API Build Responsibilities
+
+The ingestion API is a Spring Boot service. Its `pom.xml` declares the capabilities needed to receive, validate, and publish collector events without placing stream-processing logic in the request path.
+
+```mermaid
+flowchart LR
+  I["iPhone Shortcut"] --> A["Ingestion API\nSpring Boot service"]
+  A --> K["Kafka"]
+
+  P["pom.xml"] --> A
+  P --> W["HTTP endpoint support"]
+  P --> V["Request validation"]
+  P --> KP["Kafka producer support"]
+  P --> H["Health checks / tests"]
+```
 
 Ingestion responsibilities:
 
@@ -558,6 +589,16 @@ Environment principles:
 - Local setup should be reproducible
 - Services should be container-friendly
 
+### Bitwarden Secret Management
+
+Bitwarden is the source of truth for the project's secrets during local development.
+
+- Store the ingestion token, database credentials, Kafka credentials, tunnel credentials, and future deployment credentials in the personal Bitwarden vault
+- Generate unique, strong values with Bitwarden rather than reusing passwords
+- Copy secrets into the local `.env` file only when required by Docker Compose or a service; this file remains untracked by Git
+- Never place real secrets in source code, documentation, screenshots, logs, Kafka events, or GitHub Actions configuration
+- Rotate a secret in Bitwarden and every consuming local environment if it is exposed or no longer needed
+
 ---
 
 ## 20. Security and Privacy Direction
@@ -570,6 +611,7 @@ Initial security requirements:
 
 - Ingestion endpoint protected with a token
 - No secrets committed to Git
+- Secrets stored and generated through Bitwarden; the local `.env` file remains untracked
 - Local data treated as private
 - Public repository should not contain personal usage records
 - Clear separation between sample data and real personal data
@@ -917,13 +959,20 @@ Reason:
 
 The project should demonstrate professional software and data engineering workflow, not just local coding.
 
+Decision 10:
+
+TimescaleDB is the initial database, with no columnar analytics store in the first build.
+
+Reason:
+
+The project needs low-latency event ingestion, sessionization, and time-series queries on a personal dataset. TimescaleDB meets those needs while remaining PostgreSQL-compatible. A separate columnar warehouse can be added only if the project grows beyond local learning scope.
+
 ---
 
 ## 27. Open Questions
 
 Technical questions:
 
-- Should the first database be PostgreSQL or TimescaleDB?
 - Should live updates use SSE or WebSocket?
 - Should the first processor be plain Java Kafka consumer, Kafka Streams, or Flink?
 - Should the backend and processor be separate services from the beginning?
@@ -957,7 +1006,7 @@ Apple ecosystem questions:
 Next planning actions:
 
 - Finalize project name
-- Decide PostgreSQL versus TimescaleDB
+- Set up TimescaleDB as the initial operational database
 - Decide SSE versus WebSocket for live updates
 - Decide whether the first processor is plain Java, Kafka Streams, or Flink
 - Create GitHub repository

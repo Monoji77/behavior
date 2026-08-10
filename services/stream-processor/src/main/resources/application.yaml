@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: stream-processor
+
+  main:
+    web-application-type: none
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        "[spring.json.add.type.headers]": false
+    consumer:
+      group-id: raw-event-persistence-v1
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      properties:
+        "[isolation.level]": read_committed
+        "[spring.json.use.type.headers]": false
+        "[spring.json.value.default.type]": com.personalusageanalytics.processor.event.RawUsageEvent
+        "[spring.json.trusted.packages]": com.personalusageanalytics.processor.event
+    listener:
+      ack-mode: record
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    hikari:
+      maximum-pool-size: 4
+
+processor:
+  topics:
+    raw-events: app-usage-events.raw.v1
+    dead-letter: app-usage-events.dlq.v1

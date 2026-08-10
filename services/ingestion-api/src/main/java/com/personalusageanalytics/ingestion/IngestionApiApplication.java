@@ -1,0 +1,15 @@
+package com.personalusageanalytics.ingestion;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+
+@SpringBootApplication
+@ConfigurationPropertiesScan
+public class IngestionApiApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(IngestionApiApplication.class, args);
+    }
+}
