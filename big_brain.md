@@ -27,6 +27,25 @@ The frontend and backend can remain simple at the beginning. The main learning v
 
 ---
 
+## Current Implementation Status — August 2026
+
+The raw-event pipeline and initial iPhone collector are working end to end:
+
+`Instagram open/close automation → iPhone Shortcut → Spring Boot ingestion API → Kafka → stream processor → TimescaleDB raw_app_events`
+
+Completed and verified:
+
+- The ingestion API authenticates `POST /api/v1/events` requests with `X-Collector-Token`, validates the version-1 JSON event contract, and publishes accepted records to Kafka.
+- Kafka retains raw events and routes processor failures to a dead-letter topic.
+- The stream processor validates device-key consistency and writes raw records idempotently to the `raw_app_events` TimescaleDB hypertable.
+- iPhone Shortcuts send real Instagram `OPEN` and `CLOSE` events using the Windows machine's LAN address while the iPhone is on the same home network.
+
+Current limitation: the collector is local-network only. A spare always-on laptop can host the stack at home; a future secure HTTPS tunnel can make the collector reachable while the iPhone is on mobile data or another Wi-Fi network. Do not expose the API through router port forwarding.
+
+The next functional milestone is sessionisation: safely converting ordered raw `OPEN`/`CLOSE` event pairs into queryable usage sessions before building time-series rollups.
+
+---
+
 ## 2. Core Project Scope
 
 Initial real-life data source:
@@ -436,6 +455,18 @@ Ingestion responsibilities:
 - Publish accepted events to Kafka
 - Return quickly
 
+### Why the iPhone uses a Spring Boot ingestion API instead of CDC
+
+The iPhone collector is an external event source, not a database. It creates app-open and app-close events and needs an authenticated network endpoint to send them to. The Spring Boot ingestion API provides that boundary: it accepts the HTTP request, performs lightweight authentication and validation, and publishes the accepted event to the Kafka raw-events topic.
+
+Change Data Capture (CDC) has a different role. CDC observes changes that have already been committed to a database—such as inserts, updates, and deletes—and emits those database changes as events, commonly by reading a database transaction log through a tool such as Debezium. It does not provide an HTTP endpoint for an iPhone Shortcut or native mobile collector.
+
+For the initial flow, the appropriate path is:
+
+`iPhone collector → Spring Boot ingestion API → Kafka raw-events topic`
+
+CDC could complement the platform later if another application first writes relevant data into its own database and the project needs to stream those database changes to Kafka. It does not replace the ingestion API for collector-originated events.
+
 Analytics responsibilities:
 
 - Serve current summaries
@@ -745,6 +776,8 @@ ML scalability:
 
 ### Milestone 1 — Project Brain and Planning
 
+Status: Complete
+
 Outcome:
 
 - Architecture documented
@@ -754,6 +787,8 @@ Outcome:
 - Git and GitHub DevOps plan included
 
 ### Milestone 2 — Repository and Infrastructure Baseline
+
+Status: Complete
 
 Outcome:
 
@@ -765,6 +800,8 @@ Outcome:
 
 ### Milestone 3 — Ingestion Backbone
 
+Status: Complete
+
 Outcome:
 
 - Ingestion API accepts collector events
@@ -774,6 +811,8 @@ Outcome:
 
 ### Milestone 4 — Raw Event Persistence
 
+Status: Complete
+
 Outcome:
 
 - Processor consumes Kafka events
@@ -782,6 +821,8 @@ Outcome:
 - Dead-letter path exists
 
 ### Milestone 5 — Sessionization
+
+Status: Next
 
 Outcome:
 
@@ -1003,28 +1044,18 @@ Apple ecosystem questions:
 
 ## 28. Immediate Next Actions
 
-Next planning actions:
+Next implementation actions:
 
-- Finalize project name
-- Set up TimescaleDB as the initial operational database
-- Decide SSE versus WebSocket for live updates
-- Decide whether the first processor is plain Java, Kafka Streams, or Flink
-- Create GitHub repository
-- Define initial Git branch strategy
-- Define first GitHub issues
-- Prepare local Windows development environment
-- Build infrastructure baseline
-- Then implement the ingestion path
+1. Collect a small sample of real iPhone `OPEN` and `CLOSE` events, while recording any missed, duplicate, or incomplete pairs.
+2. Define sessionisation rules for matching an `OPEN` to the next valid `CLOSE` for the same app and device, including duplicate opens, unmatched closes, and an abandoned-session timeout.
+3. Add queryable session storage and implement sessionisation in the stream processor.
+4. Derive minute, hourly, and daily rollups from completed sessions.
+5. Add automated unit and integration tests around the current pipeline and sessionisation rules.
+6. When the local stack is stable, run it on an always-on spare laptop. Add a secure HTTPS tunnel only when off-home-network collection is required.
 
-Recommended first build objective:
+Recommended next build objective:
 
-Collector event  
-→ Backend ingestion  
-→ Kafka  
-→ Processor  
-→ Database  
-→ Live metric update  
-→ Frontend display  
+Raw `OPEN`/`CLOSE` event pair → session record with a duration → minute, hourly, and daily usage rollups → analytics API → live dashboard display
 
 The goal is not to build everything at once. The goal is to create a stable, scalable skeleton that future work can extend.
 

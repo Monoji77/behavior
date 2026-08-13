@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/events")
+@RequestMapping("/api/v1/events") // This defines the base path for all API endpoints in this controller
 public class UsageEventController {
 
     private final UsageEventPublisher usageEventPublisher;

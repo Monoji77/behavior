@@ -26,6 +26,7 @@ flowchart LR
 | Kafka | Working | Buffers raw events and retains failed records in a dead-letter topic. |
 | Stream processor | Working | Consumes events and writes idempotently to TimescaleDB. |
 | TimescaleDB | Working | Stores timestamped raw events in a hypertable. |
+| iPhone Shortcut collector | Working on the home LAN | Sends Instagram `OPEN` and `CLOSE` events to the ingestion API. |
 | Analytics API and dashboard | Planned | Will serve session, rollup, and live-usage views. |
 
 ## Event contract
@@ -85,13 +86,14 @@ The current pipeline has been verified locally with:
 - An authenticated API request persisted through Kafka into TimescaleDB
 - Unauthenticated (`401`) and invalid-payload (`400`) API checks
 - A forced processing failure retained in the Kafka DLQ
+- Real Instagram `OPEN` and `CLOSE` events sent from an iPhone Shortcut over the home LAN and persisted in TimescaleDB
 
 Automated test classes are the next quality milestone; the current end-to-end verification procedure is documented in [docs/local-development.md](docs/local-development.md).
 
 ## Roadmap
 
-1. Add automated unit and integration tests.
-2. Derive app sessions and time-bucket rollups from raw events.
+1. Derive app sessions and time-bucket rollups from raw events.
+2. Add automated unit and integration tests.
 3. Build the analytics API.
 4. Add live dashboard updates and a React interface.
-5. Connect the iPhone Shortcut collector using the same event contract.
+5. Make the iPhone collector available outside the home LAN through a secure HTTPS tunnel.
