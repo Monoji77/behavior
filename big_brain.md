@@ -7,10 +7,11 @@ flowchart LR
     I[iPhone Shortcut collector] -->|authenticated usage event| A[Spring Boot ingestion API]
     A -->|raw app event| K[(Kafka: raw events topic)]
     K --> P[Java stream processor]
-    P --> R[(TimescaleDB: raw events)]
-    P --> S[(TimescaleDB: sessions and time-series rollups)]
-    P --> L[Live metric updates]
-    S --> N[Spring Boot analytics API]
+    P --> R[(1. TimescaleDB: raw_app_events)]
+    R --> S[(2. TimescaleDB: active and completed sessions)]
+    S --> T[(3. TimescaleDB: minute, hourly, and daily rollups)]
+    S --> L[Live metric updates]
+    T --> N[Spring Boot analytics API]
     L --> N
     N -->|SSE or WebSocket| D[React dashboard]
 ```

@@ -37,3 +37,8 @@ processor:
   topics:
     raw-events: app-usage-events.raw.v1
     dead-letter: app-usage-events.dlq.v1
+  sessionization:
+      abandonment-timeout: PT6H
+      abandonment-check-interval: PT1M
+  rollups:
+      daily-time-zone: Asia/Singapore

@@ -1,7 +1,7 @@
 package com.personalusageanalytics.processor.consumer;
 
 import com.personalusageanalytics.processor.event.RawUsageEvent;
-import com.personalusageanalytics.processor.persistence.RawEventRepository;
+import  com.personalusageanalytics.processor.service.SessionizationService;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -10,10 +10,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class RawEventListener {
 
-    private final RawEventRepository rawEventRepository;
+    private final SessionizationService sessionizationService;
 
-    public RawEventListener(RawEventRepository rawEventRepository) {
-        this.rawEventRepository = rawEventRepository;
+    public RawEventListener(SessionizationService sessionizationService) {
+        this.sessionizationService = sessionizationService;
     }
 
     @KafkaListener(topics = "${processor.topics.raw-events}")
@@ -24,7 +24,7 @@ public class RawEventListener {
             throw new IllegalArgumentException("Kafka key does not match event deviceId");
         }
 
-        rawEventRepository.insert(
+        sessionizationService.process(
                 event,
                 record.partition(),
                 record.offset()

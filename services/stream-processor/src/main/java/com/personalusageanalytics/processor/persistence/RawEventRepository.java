@@ -32,8 +32,8 @@ public class RawEventRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void insert(RawUsageEvent event, int kafkaPartition, long kafkaOffset) {
-        jdbcTemplate.update(
+    public boolean insert(RawUsageEvent event, int kafkaPartition, long kafkaOffset) {
+        return jdbcTemplate.update(
                 INSERT_RAW_EVENT,
                 event.eventId(),
                 Timestamp.from(event.occurredAt()),
@@ -44,6 +44,6 @@ public class RawEventRepository {
                 event.deviceId(),
                 kafkaPartition,
                 kafkaOffset
-        );
+        ) == 1;
     }
 }

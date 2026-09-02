@@ -11,6 +11,9 @@ import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.FixedBackOff;
 
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+@EnableScheduling
 @SpringBootApplication
 @ConfigurationPropertiesScan
 public class StreamProcessorApplication {
