@@ -29,9 +29,13 @@ public class UsageEventPublisher {
 
     public void publish(UsageEventRequest event) {
         UsageEventRequest normalizedEvent = event.normalizedToMilliseconds();
+
         try {
             kafkaTemplate.send(
-       .get(PUBLISH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    ingestionProperties.topics().rawEvents(),
+                    normalizedEvent.deviceId(),
+                    normalizedEvent
+            ).get(PUBLISH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (KafkaException exception) {
             throw new KafkaPublishException("Unable to create Kafka producer", exception);
         } catch (InterruptedException exception) {
