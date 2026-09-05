@@ -26,17 +26,19 @@
 
 ## Start the services
 
-Keep each service running in its own PowerShell terminal.
+Keep each service running in its own PowerShell terminal. The stream processor and analytics API both require the PostgreSQL settings from `.env`; run the following setup block in each of those terminals before starting Maven. It loads values without printing the database password.
+
+```powershell
+Get-Content .env | ForEach-Object {
+  if ($_ -match '^(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_HOST|POSTGRES_PORT)=(.*)$') {
+    Set-Item -Path "Env:$($Matches[1])" -Value $Matches[2]
+  }
+}
+```
 
 1. In a second terminal, start the stream processor:
 
    ```powershell
-   $env:POSTGRES_DB = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_DB=' } | Select-Object -First 1) -replace '^POSTGRES_DB=', '')
-   $env:POSTGRES_USER = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_USER=' } | Select-Object -First 1) -replace '^POSTGRES_USER=', '')
-   $env:POSTGRES_PASSWORD = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_PASSWORD=' } | Select-Object -First 1) -replace '^POSTGRES_PASSWORD=', '')
-   $env:POSTGRES_HOST = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_HOST=' } | Select-Object -First 1) -replace '^POSTGRES_HOST=', '')
-   $env:POSTGRES_PORT = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_PORT=' } | Select-Object -First 1) -replace '^POSTGRES_PORT=', '')      
-
    mvn -f services/stream-processor/pom.xml spring-boot:run
    ```
 
@@ -51,21 +53,89 @@ Keep each service running in its own PowerShell terminal.
    mvn -f services/ingestion-api/pom.xml spring-boot:run
    ```
 
-   Wait for `Started IngestionApiApplication`, then open a fourth terminal and verify the API:
+   Wait for `Started IngestionApiApplication`.
+
+3. In a fourth terminal, load the PostgreSQL settings with the setup block above, then start the analytics API:
+
+   ```powershell
+   mvn -f services/analytics-api/pom.xml spring-boot:run
+   ```
+
+   Wait for `Started AnalyticsApiApplication`. In a fifth terminal, verify both HTTP APIs:
 
    ```powershell
    Invoke-RestMethod http://localhost:8080/actuator/health
+   Invoke-RestMethod http://localhost:8081/actuator/health
    ```
 
-   Expected result:
+   Expected result from both commands:
 
    ```text
    status : UP
    ```
 
-## End-to-end local test
+## End-to-end local session and analytics test
 
-With Docker, the processor, and the ingestion API running, use a fourth PowerShell terminal to submit an event and verify that the same event reaches TimescaleDB:
+With Docker and all three services running, use a fifth PowerShell terminal to submit an `OPEN`/`CLOSE` pair, then read its completed session and usage rollups through the analytics API:
+
+```powershell
+$tokenLine = Get-Content .env | Where-Object { $_ -match '^INGESTION_COLLECTOR_TOKEN=' } | Select-Object -First 1
+$token = $tokenLine.Substring('INGESTION_COLLECTOR_TOKEN='.Length)
+
+$deviceId = "session-test-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+$app = 'instagram'
+$openedAt = (Get-Date).ToUniversalTime().AddMinutes(-5).ToString('o')
+$closedAt = (Get-Date).ToUniversalTime().ToString('o')
+
+$openEvent = @{
+  eventId = [guid]::NewGuid()
+  occurredAt = $openedAt
+  eventType = 'OPEN'
+  app = $app
+  source = 'local-session-test'
+  deviceId = $deviceId
+} | ConvertTo-Json
+
+$closeEvent = @{
+  eventId = [guid]::NewGuid()
+  occurredAt = $closedAt
+  eventType = 'CLOSE'
+  app = $app
+  source = 'local-session-test'
+  deviceId = $deviceId
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/v1/events' `
+  -Headers @{ 'X-Collector-Token' = $token } `
+  -ContentType 'application/json' -Body $openEvent
+
+Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/v1/events' `
+  -Headers @{ 'X-Collector-Token' = $token } `
+  -ContentType 'application/json' -Body $closeEvent
+
+Start-Sleep -Seconds 3
+
+Invoke-RestMethod -Uri `
+  "http://localhost:8081/api/v1/metrics?metricName=latest-session&deviceId=$deviceId&app=$app"
+
+$from = (Get-Date).ToUniversalTime().AddHours(-1).ToString('yyyy-MM-ddTHH:mm:ssZ')
+$to = (Get-Date).ToUniversalTime().AddHours(1).ToString('yyyy-MM-ddTHH:mm:ssZ')
+$uri = "http://localhost:8081/api/v1/metrics?metricName=usage-rollup&deviceId=$deviceId&app=$app&granularity=MINUTE&from=$from&to=$to"
+
+Invoke-RestMethod -Uri $uri | ConvertTo-Json -Depth 6
+```
+
+Expected result:
+
+- Both ingestion requests return their submitted `eventId` with HTTP `202 Accepted`.
+- The `latest-session` response contains the generated `deviceId`, `status` `COMPLETED`, and a duration of approximately `300000` milliseconds.
+- The rollup response contains a non-empty `buckets` array. Its usage slices total approximately five minutes, even if the session spans multiple minute boundaries.
+
+This proves the complete path: ingestion API → Kafka → stream processor → TimescaleDB → analytics API.
+
+## Raw-event database check
+
+To inspect a raw event directly in TimescaleDB, submit an event and query it by its ID:
 
 ```powershell
 $tokenLine = Get-Content .env | Where-Object { $_ -match '^INGESTION_COLLECTOR_TOKEN=' } | Select-Object -First 1

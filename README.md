@@ -14,7 +14,7 @@ flowchart LR
     P -->|"idempotent insert"| T[("TimescaleDB\nraw_app_events")]
     P -->|"invalid or failed record"| D[("Kafka\nDLQ topic")]
 
-    T -. planned .-> A["Analytics API"]
+    T --> A["Analytics API\nSpring Boot"]
     A -. planned .-> U["React dashboard"]
 ```
 
@@ -27,7 +27,8 @@ flowchart LR
 | Stream processor | Working | Consumes events and writes idempotently to TimescaleDB. |
 | TimescaleDB | Working | Stores timestamped raw events in a hypertable. |
 | iPhone Shortcut collector | Working on the home LAN | Sends Instagram `OPEN` and `CLOSE` events to the ingestion API. |
-| Analytics API and dashboard | Planned | Will serve session, rollup, and live-usage views. |
+| Analytics API | Working | Serves latest-session, usage-rollup, and anomaly-summary metrics from TimescaleDB. |
+| React dashboard | Planned | Will display session, rollup, and live-usage views. |
 
 ## Event contract
 
@@ -55,7 +56,7 @@ Requirements:
 - Maven 3.9+
 - A local `.env` file populated from Bitwarden; never commit it
 
-The complete tested setup—including Docker health checks, starting both Spring Boot services, submitting an event, and verifying its exact database row—is in [docs/local-development.md](docs/local-development.md).
+The complete tested setup—including Docker health checks, starting all three Spring Boot services, submitting a session, and querying analytics—is in [docs/local-development.md](docs/local-development.md).
 
 On this Windows development machine, Docker TimescaleDB is exposed on port `5433`. Port `5432` is reserved by a separate native PostgreSQL installation.
 
@@ -66,6 +67,7 @@ contracts/                  Versioned event contract
 infrastructure/             Docker Compose, Kafka, and TimescaleDB setup
 services/ingestion-api/     Authenticated HTTP-to-Kafka service
 services/stream-processor/  Kafka-to-TimescaleDB persistence service
+services/analytics-api/     Read-only TimescaleDB analytics service
 docs/                       Local-development and operational guidance
 big_brain.md                Architecture decisions and roadmap
 ```
@@ -81,19 +83,21 @@ big_brain.md                Architecture decisions and roadmap
 
 The current pipeline has been verified locally with:
 
-- Maven builds for both Spring Boot services
+- Maven tests for the ingestion API, stream processor, and analytics API
 - Docker Compose configuration and health checks
 - An authenticated API request persisted through Kafka into TimescaleDB
 - Unauthenticated (`401`) and invalid-payload (`400`) API checks
 - A forced processing failure retained in the Kafka DLQ
 - Real Instagram `OPEN` and `CLOSE` events sent from an iPhone Shortcut over the home LAN and persisted in TimescaleDB
+- `OPEN`/`CLOSE` event pairs converted into completed sessions and minute, hourly, and daily usage rollups
+- Analytics API queries for the latest session and usage rollups
+- GitHub Actions tests for the ingestion API, stream processor, and analytics API
 
-Automated test classes are the next quality milestone; the current end-to-end verification procedure is documented in [docs/local-development.md](docs/local-development.md).
+The current end-to-end verification procedure is documented in [docs/local-development.md](docs/local-development.md).
 
 ## Roadmap
 
-1. Derive app sessions and time-bucket rollups from raw events.
-2. Add automated unit and integration tests.
-3. Build the analytics API.
-4. Add live dashboard updates and a React interface.
-5. Make the iPhone collector available outside the home LAN through a secure HTTPS tunnel.
+1. Build a React dashboard for session and rollup metrics.
+2. Add live dashboard updates and measure request-to-dashboard latency.
+3. Expand automated integration coverage for the full local pipeline.
+4. Make the iPhone collector available outside the home LAN through a secure HTTPS tunnel.
