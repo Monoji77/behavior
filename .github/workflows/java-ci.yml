@@ -18,6 +18,7 @@ jobs:
         service:
           - ingestion-api
           - stream-processor
+          - analytics-api
 
     steps:
       - name: Check out source
