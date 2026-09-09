@@ -1,0 +1,14 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+**/target
+**/node_modules
+**/dist
+.idea
+.vscode
+*.iml
+data
+Daily Tracker.md
+big_brain.md

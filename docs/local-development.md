@@ -1,190 +1,121 @@
 # Local development
 
-## First-time setup
+## Prerequisites
 
-1. Start Docker Desktop and wait for it to show that it is running.
-2. Fill in the two secret values from Bitwarden into the `.env` file. It is deliberately ignored by Git.
+- Docker Desktop running
+- A local `.env` file at the repository root. It is ignored by Git and must not be committed.
 
-   ```text
-   INGESTION_COLLECTOR_TOKEN=<Bitwarden collector token>
-   POSTGRES_DB=usage_analytics
-   POSTGRES_USER=usage_app
-   POSTGRES_PASSWORD=<Bitwarden database password>
-   POSTGRES_HOST=localhost
-   POSTGRES_PORT=5433
-   ```
-3. From the repository root, start Kafka and TimescaleDB:
+  ```text
+  INGESTION_COLLECTOR_TOKEN=<collector token>
+  POSTGRES_DB=usage_analytics
+  POSTGRES_USER=usage_app
+  POSTGRES_PASSWORD=<database password>
+  ```
 
-   ```powershell
-   docker compose --env-file .env -f infrastructure/compose.yaml up -d
-   docker compose --env-file .env -f infrastructure/compose.yaml ps
-   ```
+## Start the complete stack
 
-   Wait until both services report `healthy`. TimescaleDB is exposed to Windows on port `5433`, rather than `5432`, because this machine has a separate native PostgreSQL instance using port `5432`.
+From the repository root, build and start Kafka, TimescaleDB, the ingestion API, the stream processor, and the analytics API:
 
-   Docker creates `app-usage-events.raw.v1` and `app-usage-events.dlq.v1` automatically and preserves Kafka and TimescaleDB data in named Docker volumes.
-
-## Start the services
-
-Keep each service running in its own PowerShell terminal. The stream processor and analytics API both require the PostgreSQL settings from `.env`; run the following setup block in each of those terminals before starting Maven. It loads values without printing the database password.
-
-```powershell
-Get-Content .env | ForEach-Object {
-  if ($_ -match '^(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_HOST|POSTGRES_PORT)=(.*)$') {
-    Set-Item -Path "Env:$($Matches[1])" -Value $Matches[2]
-  }
-}
+```zsh
+docker compose --env-file .env -f infrastructure/compose.yaml up --build -d
+docker compose --env-file .env -f infrastructure/compose.yaml ps
 ```
 
-1. In a second terminal, start the stream processor:
+Wait for `timescaledb`, `kafka`, `ingestion-api`, and `analytics-api` to report `healthy`. `kafka-init` and `kafka-topics-init` finish successfully and exit normally. The stream processor is a non-web worker, so it has no HTTP health endpoint; confirm its Kafka partition assignment from its logs:
 
-   ```powershell
-   mvn -f services/stream-processor/pom.xml spring-boot:run
-   ```
-
-   Wait for `Started StreamProcessorApplication` and for the processor to receive its Kafka partition assignment.
-
-2. In a third terminal, start the ingestion API:
-
-   ```powershell
-   $tokenLine = Get-Content .env | Where-Object { $_ -match '^INGESTION_COLLECTOR_TOKEN=' } | Select-Object -First 1
-   $env:INGESTION_COLLECTOR_TOKEN = $tokenLine.Substring('INGESTION_COLLECTOR_TOKEN='.Length)
-
-   mvn -f services/ingestion-api/pom.xml spring-boot:run
-   ```
-
-   Wait for `Started IngestionApiApplication`.
-
-3. In a fourth terminal, load the PostgreSQL settings with the setup block above, then start the analytics API:
-
-   ```powershell
-   mvn -f services/analytics-api/pom.xml spring-boot:run
-   ```
-
-   Wait for `Started AnalyticsApiApplication`. In a fifth terminal, verify both HTTP APIs:
-
-   ```powershell
-   Invoke-RestMethod http://localhost:8080/actuator/health
-   Invoke-RestMethod http://localhost:8081/actuator/health
-   ```
-
-   Expected result from both commands:
-
-   ```text
-   status : UP
-   ```
-
-## End-to-end local session and analytics test
-
-With Docker and all three services running, use a fifth PowerShell terminal to submit an `OPEN`/`CLOSE` pair, then read its completed session and usage rollups through the analytics API:
-
-```powershell
-$tokenLine = Get-Content .env | Where-Object { $_ -match '^INGESTION_COLLECTOR_TOKEN=' } | Select-Object -First 1
-$token = $tokenLine.Substring('INGESTION_COLLECTOR_TOKEN='.Length)
-
-$deviceId = "session-test-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
-$app = 'instagram'
-$openedAt = (Get-Date).ToUniversalTime().AddMinutes(-5).ToString('o')
-$closedAt = (Get-Date).ToUniversalTime().ToString('o')
-
-$openEvent = @{
-  eventId = [guid]::NewGuid()
-  occurredAt = $openedAt
-  eventType = 'OPEN'
-  app = $app
-  source = 'local-session-test'
-  deviceId = $deviceId
-} | ConvertTo-Json
-
-$closeEvent = @{
-  eventId = [guid]::NewGuid()
-  occurredAt = $closedAt
-  eventType = 'CLOSE'
-  app = $app
-  source = 'local-session-test'
-  deviceId = $deviceId
-} | ConvertTo-Json
-
-Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/v1/events' `
-  -Headers @{ 'X-Collector-Token' = $token } `
-  -ContentType 'application/json' -Body $openEvent
-
-Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/v1/events' `
-  -Headers @{ 'X-Collector-Token' = $token } `
-  -ContentType 'application/json' -Body $closeEvent
-
-Start-Sleep -Seconds 3
-
-Invoke-RestMethod -Uri `
-  "http://localhost:8081/api/v1/metrics?metricName=latest-session&deviceId=$deviceId&app=$app"
-
-$from = (Get-Date).ToUniversalTime().AddHours(-1).ToString('yyyy-MM-ddTHH:mm:ssZ')
-$to = (Get-Date).ToUniversalTime().AddHours(1).ToString('yyyy-MM-ddTHH:mm:ssZ')
-$uri = "http://localhost:8081/api/v1/metrics?metricName=usage-rollup&deviceId=$deviceId&app=$app&granularity=MINUTE&from=$from&to=$to"
-
-Invoke-RestMethod -Uri $uri | ConvertTo-Json -Depth 6
+```zsh
+docker compose --env-file .env -f infrastructure/compose.yaml logs --tail=100 stream-processor
 ```
 
-Expected result:
+The Compose network exposes only these APIs to the host:
 
-- Both ingestion requests return their submitted `eventId` with HTTP `202 Accepted`.
-- The `latest-session` response contains the generated `deviceId`, `status` `COMPLETED`, and a duration of approximately `300000` milliseconds.
-- The rollup response contains a non-empty `buckets` array. Its usage slices total approximately five minutes, even if the session spans multiple minute boundaries.
+- Ingestion API: `http://localhost:8080`
+- Analytics API: `http://localhost:8081`
 
-This proves the complete path: ingestion API → Kafka → stream processor → TimescaleDB → analytics API.
+Kafka and TimescaleDB are internal-only. Inspect them through `docker compose exec` rather than a host port.
 
-## Raw-event database check
+## Health checks
 
-To inspect a raw event directly in TimescaleDB, submit an event and query it by its ID:
-
-```powershell
-$tokenLine = Get-Content .env | Where-Object { $_ -match '^INGESTION_COLLECTOR_TOKEN=' } | Select-Object -First 1
-$token = $tokenLine.Substring('INGESTION_COLLECTOR_TOKEN='.Length)
-
-$eventId = [guid]::NewGuid()
-
-$body = @{
-  eventId = $eventId
-  occurredAt = (Get-Date).ToUniversalTime().ToString('o')
-  eventType = 'OPEN'
-  app = 'instagram'
-  source = 'local-integration-test'
-  deviceId = 'iphone-personal'
-} | ConvertTo-Json
-
-$response = Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/v1/events' `
-  -Headers @{ 'X-Collector-Token' = $token } `
-  -ContentType 'application/json' -Body $body
-
-$response
-
-Start-Sleep -Seconds 3
-
-docker compose --env-file .env -f infrastructure/compose.yaml exec -T timescaledb `
-  psql -U usage_app -d usage_analytics `
-  -c "SELECT event_id, event_type, app, source, device_id, kafka_partition, kafka_offset FROM raw_app_events WHERE event_id = '$eventId';"
+```zsh
+curl --fail --silent http://localhost:8080/actuator/health
+curl --fail --silent http://localhost:8081/actuator/health
 ```
 
-Expected result:
+Both commands must return `{"status":"UP"}`.
 
-- The API response returns the submitted `eventId` with HTTP `202 Accepted`.
-- The SQL query returns one row for that same `eventId`.
-- `kafka_partition` is `0` and `kafka_offset` has a numeric value.
+## End-to-end session and analytics test
 
-This proves the complete path: ingestion API → Kafka → stream processor → TimescaleDB.
+Set a test token without printing it:
 
-## Stop local services
+```zsh
+read -rs 'token?Collector token: '; echo
+```
 
-Press `Ctrl+C` in the processor and API terminals. To stop the Docker services while preserving their named volumes, run:
+Submit an `OPEN` and `CLOSE` event. Replace the two UUID placeholders with distinct UUIDs and use the same device ID for both events.
 
-```powershell
+```zsh
+curl --fail-with-body --request POST http://localhost:8080/api/v1/events \
+  --header "X-Collector-Token: $token" \
+  --header 'Content-Type: application/json' \
+  --data '{"eventId":"<open-event-uuid>","occurredAt":"2026-09-09T10:00:00Z","eventType":"OPEN","app":"instagram","source":"local-session-test","deviceId":"session-test-001"}'
+
+curl --fail-with-body --request POST http://localhost:8080/api/v1/events \
+  --header "X-Collector-Token: $token" \
+  --header 'Content-Type: application/json' \
+  --data '{"eventId":"<close-event-uuid>","occurredAt":"2026-09-09T10:05:00Z","eventType":"CLOSE","app":"instagram","source":"local-session-test","deviceId":"session-test-001"}'
+```
+
+After a few seconds, request the completed session and usage rollups:
+
+```zsh
+curl --fail --get http://localhost:8081/api/v1/metrics \
+  --data-urlencode metricName=latest-session \
+  --data-urlencode deviceId=session-test-001 \
+  --data-urlencode app=instagram
+
+curl --fail --get http://localhost:8081/api/v1/metrics \
+  --data-urlencode metricName=usage-rollup \
+  --data-urlencode deviceId=session-test-001 \
+  --data-urlencode app=instagram \
+  --data-urlencode granularity=MINUTE \
+  --data-urlencode from=2026-09-09T09:00:00Z \
+  --data-urlencode to=2026-09-09T11:00:00Z
+```
+
+The latest session must be `COMPLETED` with a duration of approximately 300,000 milliseconds, and the rollup must contain usage buckets totaling five minutes.
+
+## Inspect raw events
+
+Use the database container rather than exposing a database port:
+
+```zsh
+docker compose --env-file .env -f infrastructure/compose.yaml exec timescaledb \
+  psql -U usage_app -d usage_analytics \
+  -c 'SELECT event_id, event_type, app, source, device_id, kafka_partition, kafka_offset FROM raw_app_events ORDER BY occurred_at DESC LIMIT 20;'
+```
+
+If your local `.env` uses different database or user names, substitute those two values. Do not paste passwords into shell history.
+
+## iPhone Shortcut
+
+The iPhone and Mac must share a private network. Find the Mac's current Wi-Fi address:
+
+```zsh
+ipconfig getifaddr en0
+```
+
+In the Shortcut, replace `localhost` with that address, for example:
+
+```text
+http://172.20.10.3:8080/api/v1/events
+```
+
+First open `http://<mac-lan-ip>:8080/actuator/health` in iPhone Safari. If it does not respond, confirm both devices are on the same non-guest network and allow incoming connections to the ingestion API in macOS Firewall settings.
+
+## Stop the stack
+
+```zsh
 docker compose --env-file .env -f infrastructure/compose.yaml down
 ```
 
-Do not add `-v` unless you deliberately want to delete all local Kafka and TimescaleDB data.
-
-## iPhone Shortcut request
-
-Once the local test succeeds, use the same method, headers, and JSON shape in the Shortcut's **Get Contents of URL** action. Replace `localhost` with the Windows machine's LAN IP address, such as `http://192.168.x.x:8080/api/v1/events`. The iPhone and PC must be on the same network, and Windows Firewall must allow inbound TCP port 8080 on the private network.
-
-Do not put the token in any screenshot, commit, or public issue.
+This preserves the named Kafka and TimescaleDB volumes. Do not add `--volumes` unless you deliberately want to delete all local event data.

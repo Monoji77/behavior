@@ -52,13 +52,11 @@ Events are keyed by `deviceId` in Kafka so a device's events retain their order 
 Requirements:
 
 - Docker Desktop
-- Java 21
-- Maven 3.9+
 - A local `.env` file populated from Bitwarden; never commit it
 
 The complete tested setup—including Docker health checks, starting all three Spring Boot services, submitting a session, and querying analytics—is in [docs/local-development.md](docs/local-development.md).
 
-On this Windows development machine, Docker TimescaleDB is exposed on port `5433`. Port `5432` is reserved by a separate native PostgreSQL installation.
+Docker builds and runs Kafka, TimescaleDB, and all three Spring Boot services. Only the ingestion API (`8080`) and analytics API (`8081`) are exposed to the host; Kafka and TimescaleDB remain on the internal Compose network.
 
 ## Repository layout
 
