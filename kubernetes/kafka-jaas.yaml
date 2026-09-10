@@ -1,0 +1,13 @@
+# kafka-jaas.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-jaas
+  namespace: kafka
+data:
+  jaas.conf: |
+    KafkaServer {
+      org.apache.kafka.common.security.scram.ScramLoginModule required
+      username="admin"
+      password="supersecret";
+    };

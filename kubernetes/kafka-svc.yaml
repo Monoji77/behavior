@@ -1,0 +1,16 @@
+# kafka-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: kafka
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: kafka
+  ports:
+    - name: internal
+      port: 9092
+    - name: controller
+      port: 9093

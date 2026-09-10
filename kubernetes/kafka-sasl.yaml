@@ -1,0 +1,10 @@
+# kafka-sasl.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kafka-sasl
+  namespace: kafka
+type: Opaque
+stringData:
+  username: admin
+  password: supersecret
