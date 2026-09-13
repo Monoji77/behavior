@@ -22,3 +22,6 @@ Daily Tracker.md
 **/dist/
 
 big_brain.md
+
+# Local Kubernetes secrets created from the tracked templates
+kubernetes/*.local.yaml

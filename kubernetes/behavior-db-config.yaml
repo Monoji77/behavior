@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: behavior-db-config
+  namespace: behavior
+data:
+  POSTGRES_DB: usage_analytics
+  POSTGRES_USER: usage_app

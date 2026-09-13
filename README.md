@@ -58,6 +58,14 @@ The complete tested setup—including Docker health checks, starting all three S
 
 Docker builds and runs Kafka, TimescaleDB, and all three Spring Boot services. Only the ingestion API (`8080`) and analytics API (`8081`) are exposed to the host; Kafka and TimescaleDB remain on the internal Compose network.
 
+## Run on local Kubernetes
+
+The project also has a reproducible Docker Desktop Kubernetes deployment with
+three Kafka brokers, persistent TimescaleDB storage, and all three Spring
+services. Follow [kubernetes/README.md](kubernetes/README.md) for the ordered
+bootstrap steps. It keeps local credentials out of Git by using ignored local
+secret manifests copied from the tracked templates.
+
 ## Repository layout
 
 ```text

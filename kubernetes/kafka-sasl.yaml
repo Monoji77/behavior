@@ -1,4 +1,5 @@
-# kafka-sasl.yaml
+# Template only. Copy to kafka-sasl.local.yaml, replace both values, then apply
+# the local file. The local copy is ignored by Git.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -6,5 +7,5 @@ metadata:
   namespace: kafka
 type: Opaque
 stringData:
-  username: admin
-  password: supersecret
+  username: CHANGE_ME_KAFKA_USERNAME
+  password: CHANGE_ME_KAFKA_PASSWORD

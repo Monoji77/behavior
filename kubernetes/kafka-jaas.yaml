@@ -1,13 +1,15 @@
-# kafka-jaas.yaml
+# Template only. Copy to kafka-jaas.local.yaml, replace both values with the
+# same values in kafka-sasl.local.yaml, then apply the local file.
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: kafka-jaas
+  name: kafka-broker-jaas
   namespace: kafka
-data:
+type: Opaque
+stringData:
   jaas.conf: |
     KafkaServer {
       org.apache.kafka.common.security.scram.ScramLoginModule required
-      username="admin"
-      password="supersecret";
+      username="CHANGE_ME_KAFKA_USERNAME"
+      password="CHANGE_ME_KAFKA_PASSWORD";
     };

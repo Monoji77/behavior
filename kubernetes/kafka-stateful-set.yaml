@@ -26,8 +26,8 @@ spec:
           emptyDir: {}
 
         - name: kafka-jaas
-          configMap:
-            name: kafka-jaas
+          secret:
+            name: kafka-broker-jaas
 
       initContainers:
 
@@ -45,6 +45,17 @@ spec:
 
         - name: format-storage
           image: apache/kafka:4.2.0
+          env:
+            - name: KAFKA_BOOTSTRAP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-sasl
+                  key: username
+            - name: KAFKA_BOOTSTRAP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-sasl
+                  key: password
           command:
             - sh
             - -c
@@ -67,6 +78,7 @@ spec:
                 /opt/kafka/bin/kafka-storage.sh format \
                   --ignore-formatted \
                   --cluster-id q1Sh-9_ISia_zwGINzRvyQ \
+                  --add-scram "SCRAM-SHA-512=[name=${KAFKA_BOOTSTRAP_USERNAME},password=${KAFKA_BOOTSTRAP_PASSWORD}]" \
                   --config /tmp/kraft.properties
               else
                 echo "Already formatted, skipping."
