@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: ingestion-api
-          image: ghcr.io/monoji77/behavior-ingestion-api:e4c269eceb9458c1ac8612ea126487b415d1e56d
+          image: ghcr.io/monoji77/behavior-ingestion-api:203a0fddd65535fd71a62331ad8dcdfb2d3a2932
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -99,7 +99,7 @@ spec:
     spec:
       containers:
         - name: stream-processor
-          image: ghcr.io/monoji77/behavior-stream-processor:e4c269eceb9458c1ac8612ea126487b415d1e56d
+          image: ghcr.io/monoji77/behavior-stream-processor:203a0fddd65535fd71a62331ad8dcdfb2d3a2932
           imagePullPolicy: IfNotPresent
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
@@ -166,7 +166,7 @@ spec:
     spec:
       containers:
         - name: analytics-api
-          image: ghcr.io/monoji77/behavior-analytics-api:e4c269eceb9458c1ac8612ea126487b415d1e56d
+          image: ghcr.io/monoji77/behavior-analytics-api:203a0fddd65535fd71a62331ad8dcdfb2d3a2932
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -232,6 +232,8 @@ kind: Service
 metadata:
   name: ingestion-api-metrics
   namespace: behavior
+  labels:
+    app: ingestion-api
 spec:
   type: ClusterIP
   selector:
@@ -246,6 +248,8 @@ kind: Service
 metadata:
   name: analytics-api-metrics
   namespace: behavior
+  labels:
+    app: analytics-api
 spec:
   type: ClusterIP
   selector:
@@ -254,3 +258,35 @@ spec:
     - name: metrics
       port: 9090
       targetPort: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ingestion-api
+  namespace: behavior
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: ingestion-api
+  endpoints:
+    - port: metrics
+      path: /actuator/prometheus
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: analytics-api
+  namespace: behavior
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: analytics-api
+  endpoints:
+    - port: metrics
+      path: /actuator/prometheus
+      interval: 30s
