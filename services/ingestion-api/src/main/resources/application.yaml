@@ -16,14 +16,19 @@ server:
   port: ${SERVER_PORT:8080}
 
 management:
+  server:
+    port: 9090
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 ingestion:
   collector-token: ${INGESTION_COLLECTOR_TOKEN}
