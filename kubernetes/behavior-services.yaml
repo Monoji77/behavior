@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: ingestion-api
-          image: personal-usage-analytics-ingestion-api:latest
+          image: ghcr.io/monoji77/behavior-ingestion-api:e4c269eceb9458c1ac8612ea126487b415d1e56d
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -97,7 +97,7 @@ spec:
     spec:
       containers:
         - name: stream-processor
-          image: personal-usage-analytics-stream-processor:latest
+          image: ghcr.io/monoji77/behavior-stream-processor:e4c269eceb9458c1ac8612ea126487b415d1e56d
           imagePullPolicy: IfNotPresent
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
@@ -164,7 +164,7 @@ spec:
     spec:
       containers:
         - name: analytics-api
-          image: personal-usage-analytics-analytics-api:latest
+          image: ghcr.io/monoji77/behavior-analytics-api:e4c269eceb9458c1ac8612ea126487b415d1e56d
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
