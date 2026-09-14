@@ -1,0 +1,28 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: behavior-application-alerts
+  namespace: behavior
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: behavior.application
+      rules:
+        - alert: BehaviorApplicationTargetDown
+          expr: up{namespace="behavior", service=~"ingestion-api-metrics|analytics-api-metrics"} == 0
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Behavior service {{ $labels.service }} is unavailable.'
+            description: 'Prometheus has been unable to scrape this service for two minutes.'
+
+        - alert: BehaviorIngestionServerErrors
+          expr: sum(increase(http_server_requests_seconds_count{namespace="behavior", application="ingestion-api", status=~"5.."}[5m])) > 3
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Ingestion API is returning server errors.'
+            description: 'More than three HTTP 5xx responses occurred in the last five minutes.'
