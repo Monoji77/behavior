@@ -27,7 +27,7 @@ spec:
 
         - name: kafka-jaas
           secret:
-            name: kafka-broker-jaas
+            secretName: kafka-broker-jaas
 
       initContainers:
 
