@@ -5,6 +5,23 @@ namespace: behavior
 resources:
   - ../../kubernetes
 
+# This cluster does not have the Prometheus Operator ServiceMonitor CRD.
+patches:
+  - patch: |-
+      $patch: delete
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: ingestion-api
+        namespace: behavior
+  - patch: |-
+      $patch: delete
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: analytics-api
+        namespace: behavior
+
 # Promote a release by updating all three tags to the same published commit SHA.
 images:
   - name: ghcr.io/monoji77/behavior-ingestion-api
