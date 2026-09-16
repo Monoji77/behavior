@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: behavior
+resources:
+  - ../../kubernetes
+
+# Promote a release by updating all three tags to the same published commit SHA.
+images:
+  - name: ghcr.io/monoji77/behavior-ingestion-api
+    newTag: "203a0fddd65535fd71a62331ad8dcdfb2d3a2932"
+  - name: ghcr.io/monoji77/behavior-stream-processor
+    newTag: "203a0fddd65535fd71a62331ad8dcdfb2d3a2932"
+  - name: ghcr.io/monoji77/behavior-analytics-api
+    newTag: "203a0fddd65535fd71a62331ad8dcdfb2d3a2932"
