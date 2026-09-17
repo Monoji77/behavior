@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import yaml
 
 DEPLOY = "deploy/homelab"
 
@@ -38,13 +39,15 @@ def promote(source):
         # Copy the exact tested source tree while retaining deployment history.
         git("read-tree", "--reset", "-u", source)
         overlay = Path("gitops/behavior/kustomization.yaml")
-        content = overlay.read_text()
+        content = yaml.safe_load(overlay.read_text())
+        images = content["images"]
         for service in ("ingestion-api", "stream-processor", "analytics-api"):
-            pattern = rf'(?m)^(  - name: ghcr\.io/monoji77/behavior-{service}\n    newTag:)[^\n]*$'
-            content, count = re.subn(pattern, lambda m: m[1] + f' "{source}"', content)
-            if count != 1:
+            matches = [entry for entry in images
+                       if entry.get("name") == f"ghcr.io/monoji77/behavior-{service}"]
+            if len(matches) != 1:
                 raise RuntimeError(f"Expected exactly one image entry for {service}")
-        overlay.write_text(content)
+            matches[0]["newTag"] = source
+        overlay.write_text(yaml.safe_dump(content, sort_keys=False))
         git("add", "gitops/behavior/kustomization.yaml")
         if git("diff", "--cached", "--quiet", check=False).returncode == 0:
             report(f"Already promoted: {source}")

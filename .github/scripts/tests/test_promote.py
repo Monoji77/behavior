@@ -109,6 +109,16 @@ class PromotionTest(unittest.TestCase):
         competing = self.conflict(newer_source=True)
         self.assertEqual(self.deployment(), competing)
 
+    def test_accepts_reordered_keys_and_different_yaml_indentation(self):
+        overlay = self.author / "gitops/behavior/kustomization.yaml"
+        overlay.write_text("images:\n" + "".join(
+            f'    - newTag: initial\n      name: ghcr.io/monoji77/behavior-{s}\n'
+            for s in ("ingestion-api", "stream-processor", "analytics-api")))
+        source = self.advance_main()
+        promotion.promote(source)
+        result = self.command(self.remote, "show", "deploy/homelab:gitops/behavior/kustomization.yaml")
+        self.assertEqual(result.count(source), 3)
+
     def test_rejects_invalid_sha(self):
         with self.assertRaises(ValueError):
             promotion.promote("main")

@@ -8,7 +8,8 @@ manifest validation (which also tests promotion logic). Keep the PR up to date
 with main. Required checks apply to administrators too. A second reviewer is not
 required for this single-maintainer repository.
 
-PR builds do not publish images or deploy. After merge, CI tests again and
+PR builds have read-only token permissions and do not publish images or deploy.
+A separate main-only publishing job receives package write permission. After merge, CI tests again and
 publishes all three images with the full main commit SHA. The mutable latest tag
 is no longer published; deployment always uses SHA tags.
 

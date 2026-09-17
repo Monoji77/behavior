@@ -51,12 +51,40 @@ jobs:
         uses: docker://ghcr.io/yannh/kubeconform:v0.7.0
         with:
           args: -strict -summary -kubernetes-version 1.36.0 behavior-rendered.yaml
+      - name: Install promotion parser
+        run: python3 -m pip install PyYAML==6.0.2
       - name: Test promotion freshness and conflicts
         run: python3 -m unittest discover -s .github/scripts/tests -v
 
   build:
     name: Build ${{ matrix.service }}
     needs: [test, validate]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [ingestion-api, stream-processor, analytics-api]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Build PR image without publishing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/${{ matrix.service }}/Dockerfile
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/behavior-${{ matrix.service }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+  publish:
+    name: Publish ${{ matrix.service }}
+    needs: [test, validate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -80,7 +108,7 @@ jobs:
         with:
           context: .
           file: ./services/${{ matrix.service }}/Dockerfile
-          push: ${{ github.event_name == 'push' }}
+          push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/behavior-${{ matrix.service }}:${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
@@ -88,13 +116,15 @@ jobs:
 
   promote:
     name: Promote published images
-    needs: [test, validate, build]
+    needs: [test, validate, publish]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
+      - name: Install promotion parser
+        run: python3 -m pip install PyYAML==6.0.2
       - name: Promote only the current main commit
         env:
           SOURCE_SHA: ${{ github.sha }}
