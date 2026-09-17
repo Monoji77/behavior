@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 
-# Cancel obsolete PR checks. Main promotions serialize below and check freshness.
+# Cancel obsolete PR checks. Main runs independently recheck freshness.
 concurrency:
   group: behavior-ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -93,9 +93,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    concurrency:
-      group: behavior-image-promotion
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
       - name: Promote only the current main commit

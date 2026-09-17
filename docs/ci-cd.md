@@ -28,8 +28,8 @@ Promotion runs only after all main checks and image publications succeed:
 
 Superseded runs report a successful skip in the Actions summary. A failing newer
 build does not permit an older build to promote; the prior deployed release stays
-in place. PR runs cancel older runs for the same PR. Promotion jobs are serialized,
-but correctness relies on freshness checks, not job ordering.
+in place. PR runs cancel older runs for the same PR. Promotion jobs use normal Git push conflicts
+to coordinate, avoiding concurrency queues that can discard pending releases.
 
 The main check and deployment push are separate Git operations. A source commit
 arriving after the final check can start the next release cycle while the checked
