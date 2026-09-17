@@ -37,6 +37,21 @@ jobs:
       - name: Run clean Maven tests
         run: mvn --batch-mode --file services/${{ matrix.service }}/pom.xml clean test
 
+  dashboard-test:
+    name: Test dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: services/dashboard/package-lock.json
+      - name: Install dashboard dependencies
+        run: npm ci --prefix services/dashboard
+      - name: Run dashboard tests
+        run: npm test --prefix services/dashboard
+
   validate:
     name: Validate deployment manifests
     runs-on: ubuntu-latest
@@ -58,7 +73,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.service }}
-    needs: [test, validate]
+    needs: [test, dashboard-test, validate]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -66,7 +81,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [ingestion-api, stream-processor, analytics-api]
+        service: [ingestion-api, stream-processor, analytics-api, dashboard]
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v3
@@ -83,7 +98,7 @@ jobs:
 
   publish:
     name: Publish ${{ matrix.service }}
-    needs: [test, validate]
+    needs: [test, dashboard-test, validate]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -92,7 +107,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [ingestion-api, stream-processor, analytics-api]
+        service: [ingestion-api, stream-processor, analytics-api, dashboard]
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v3
@@ -116,7 +131,7 @@ jobs:
 
   promote:
     name: Promote published images
-    needs: [test, validate, publish]
+    needs: [test, dashboard-test, validate, publish]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

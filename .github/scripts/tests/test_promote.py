@@ -28,7 +28,7 @@ class PromotionTest(unittest.TestCase):
         overlay.parent.mkdir(parents=True)
         overlay.write_text("images:\n" + "".join(
             f'  - name: ghcr.io/monoji77/behavior-{s}\n    newTag: "initial"\n'
-            for s in ("ingestion-api", "stream-processor", "analytics-api")))
+            for s in ("ingestion-api", "stream-processor", "analytics-api", "dashboard")))
         self.command(self.author, "add", ".")
         self.command(self.author, "commit", "-m", "Initial")
         self.initial = self.command(self.author, "rev-parse", "HEAD")
@@ -59,7 +59,7 @@ class PromotionTest(unittest.TestCase):
         self.assertNotEqual(deployed, self.initial)
         self.assertEqual(self.command(self.remote, "rev-parse", deployed + "^"), self.initial)
         overlay = self.command(self.remote, "show", "deploy/homelab:gitops/behavior/kustomization.yaml")
-        self.assertEqual(overlay.count(self.source), 3)
+        self.assertEqual(overlay.count(self.source), 4)
         self.assertEqual(self.command(self.remote, "show", "deploy/homelab:source.txt"), "change")
         self.assertEqual(self.command(self.remote, "rev-parse", "main"), self.source)
         promotion.promote(self.source)
@@ -113,11 +113,11 @@ class PromotionTest(unittest.TestCase):
         overlay = self.author / "gitops/behavior/kustomization.yaml"
         overlay.write_text("images:\n" + "".join(
             f'    - newTag: initial\n      name: ghcr.io/monoji77/behavior-{s}\n'
-            for s in ("ingestion-api", "stream-processor", "analytics-api")))
+            for s in ("ingestion-api", "stream-processor", "analytics-api", "dashboard")))
         source = self.advance_main()
         promotion.promote(source)
         result = self.command(self.remote, "show", "deploy/homelab:gitops/behavior/kustomization.yaml")
-        self.assertEqual(result.count(source), 3)
+        self.assertEqual(result.count(source), 4)
 
     def test_rejects_invalid_sha(self):
         with self.assertRaises(ValueError):

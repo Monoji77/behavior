@@ -15,7 +15,7 @@ flowchart LR
     P -->|"invalid or failed record"| D[("Kafka\nDLQ topic")]
 
     T --> A["Analytics API\nSpring Boot"]
-    A -. planned .-> U["React dashboard"]
+    A --> U["React dashboard\nNginx frontend"]
 ```
 
 ## Current capabilities
@@ -28,7 +28,7 @@ flowchart LR
 | TimescaleDB | Working | Stores timestamped raw events in a hypertable. |
 | iPhone Shortcut collector | Working on the home LAN | Sends Instagram `OPEN` and `CLOSE` events to the ingestion API. |
 | Analytics API | Working | Serves latest-session, usage-rollup, and anomaly-summary metrics from TimescaleDB. |
-| React dashboard | Planned | Will display session, rollup, and live-usage views. |
+| React dashboard | Working | Displays session, rollup, and anomaly metrics through the Analytics API. |
 
 ## Event contract
 
@@ -56,7 +56,7 @@ Requirements:
 
 The complete tested setup—including Docker health checks, starting all three Spring Boot services, submitting a session, and querying analytics—is in [docs/local-development.md](docs/local-development.md).
 
-Docker builds and runs Kafka, TimescaleDB, and all three Spring Boot services. Only the ingestion API (`8080`) and analytics API (`8081`) are exposed to the host; Kafka and TimescaleDB remain on the internal Compose network.
+Docker builds and runs Kafka, TimescaleDB, all three Spring Boot services, and the React dashboard. The ingestion API (`8080`), analytics API (`8081`), and dashboard (`8082`) are exposed to the host; Kafka and TimescaleDB remain on the internal Compose network.
 
 ## Run on local Kubernetes
 
@@ -74,6 +74,7 @@ infrastructure/             Docker Compose, Kafka, and TimescaleDB setup
 services/ingestion-api/     Authenticated HTTP-to-Kafka service
 services/stream-processor/  Kafka-to-TimescaleDB persistence service
 services/analytics-api/     Read-only TimescaleDB analytics service
+services/dashboard/         React frontend served by Nginx
 docs/                       Local-development and operational guidance
 big_brain.md                Architecture decisions and roadmap
 ```
@@ -97,13 +98,12 @@ The current pipeline has been verified locally with:
 - Real Instagram `OPEN` and `CLOSE` events sent from an iPhone Shortcut over the home LAN and persisted in TimescaleDB
 - `OPEN`/`CLOSE` event pairs converted into completed sessions and minute, hourly, and daily usage rollups
 - Analytics API queries for the latest session and usage rollups
-- GitHub Actions tests for the ingestion API, stream processor, and analytics API
+- GitHub Actions tests for the ingestion API, stream processor, analytics API, and dashboard
 
 The current end-to-end verification procedure is documented in [docs/local-development.md](docs/local-development.md).
 
 ## Roadmap
 
-1. Build a React dashboard for session and rollup metrics.
-2. Add live dashboard updates and measure request-to-dashboard latency.
-3. Expand automated integration coverage for the full local pipeline.
-4. Make the iPhone collector available outside the home LAN through a secure HTTPS tunnel.
+1. Add live dashboard updates and measure request-to-dashboard latency.
+2. Expand automated integration coverage for the full local pipeline.
+3. Make the iPhone collector available outside the home LAN through a secure HTTPS tunnel.
