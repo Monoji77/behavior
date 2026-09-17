@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""Promote an eligible source snapshot in a disposable CI checkout."""
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+DEPLOY = "deploy/homelab"
+
+def git(*args, check=True):
+    return subprocess.run(["git", *args], check=check, text=True, capture_output=True)
+
+def report(message):
+    print(message, flush=True)
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+            summary.write(message + "\n")
+
+def refresh():
+    git("fetch", "--no-tags", "origin",
+        "+refs/heads/main:refs/remotes/origin/main",
+        f"+refs/heads/{DEPLOY}:refs/remotes/origin/{DEPLOY}")
+
+def promote(source):
+    if not re.fullmatch(r"[0-9a-f]{40}", source):
+        raise ValueError("Expected the full source commit SHA")
+    if git("status", "--porcelain").stdout.strip():
+        raise RuntimeError("Promotion requires a clean, disposable checkout")
+    git("config", "user.name", "github-actions[bot]")
+    git("config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
+    for attempt in range(3):
+        refresh()
+        if git("rev-parse", "origin/main").stdout.strip() != source:
+            report(f"Skipped: {source} was superseded by a newer main commit.")
+            return
+        git("checkout", "--detach", f"origin/{DEPLOY}")
+        # Copy the exact tested source tree while retaining deployment history.
+        git("read-tree", "--reset", "-u", source)
+        overlay = Path("gitops/behavior/kustomization.yaml")
+        content = overlay.read_text()
+        for service in ("ingestion-api", "stream-processor", "analytics-api"):
+            pattern = rf'(?m)^(  - name: ghcr\.io/monoji77/behavior-{service}\n    newTag:)[^\n]*$'
+            content, count = re.subn(pattern, lambda m: m[1] + f' "{source}"', content)
+            if count != 1:
+                raise RuntimeError(f"Expected exactly one image entry for {service}")
+        overlay.write_text(content)
+        git("add", "gitops/behavior/kustomization.yaml")
+        if git("diff", "--cached", "--quiet", check=False).returncode == 0:
+            report(f"Already promoted: {source}")
+            return
+        git("commit", "-m", f"Promote behavior images to {source}")
+        # Check again after preparing the commit; never push an observed stale build.
+        refresh()
+        if git("rev-parse", "origin/main").stdout.strip() != source:
+            report(f"Skipped: {source} was superseded while preparing promotion.")
+            return
+        result = git("push", "origin", f"HEAD:refs/heads/{DEPLOY}", check=False)
+        if result.returncode == 0:
+            report(f"Promoted {source} to {DEPLOY}.")
+            return
+        print(result.stderr, file=sys.stderr)
+        # A competing deployment commit causes a normal non-fast-forward rejection.
+        # Re-fetch and re-check source freshness before rebuilding on its new parent.
+    raise RuntimeError("Promotion failed after three attempts; deployment was not force-pushed")
+
+if __name__ == "__main__":
+    promote(sys.argv[1])

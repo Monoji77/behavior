@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/Monoji77/behavior.git
-    targetRevision: main
+    targetRevision: deploy/homelab
     path: gitops/behavior
   destination:
     server: https://kubernetes.default.svc
