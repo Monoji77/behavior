@@ -14,14 +14,14 @@
 
 ## Start the complete stack
 
-From the repository root, build and start Kafka, TimescaleDB, the ingestion API, the stream processor, and the analytics API:
+From the repository root, build and start Kafka, TimescaleDB, the ingestion API, the stream processor, the analytics API, and the dashboard:
 
 ```zsh
 docker compose --env-file .env -f infrastructure/compose.yaml up --build -d
 docker compose --env-file .env -f infrastructure/compose.yaml ps
 ```
 
-Wait for `timescaledb`, `kafka`, `ingestion-api`, and `analytics-api` to report `healthy`. `kafka-init` and `kafka-topics-init` finish successfully and exit normally. The stream processor is a non-web worker, so it has no HTTP health endpoint; confirm its Kafka partition assignment from its logs:
+Wait for `timescaledb`, `kafka`, `ingestion-api`, `analytics-api`, and `dashboard` to report `healthy`. `kafka-init` and `kafka-topics-init` finish successfully and exit normally. The stream processor is a non-web worker, so it has no HTTP health endpoint; confirm its Kafka partition assignment from its logs:
 
 ```zsh
 docker compose --env-file .env -f infrastructure/compose.yaml logs --tail=100 stream-processor
@@ -31,6 +31,7 @@ The Compose network exposes only these APIs to the host:
 
 - Ingestion API: `http://localhost:8080`
 - Analytics API: `http://localhost:8081`
+- Dashboard: `http://localhost:8082`
 
 Kafka and TimescaleDB are internal-only. Inspect them through `docker compose exec` rather than a host port.
 
@@ -39,9 +40,10 @@ Kafka and TimescaleDB are internal-only. Inspect them through `docker compose ex
 ```zsh
 curl --fail --silent http://localhost:8080/actuator/health
 curl --fail --silent http://localhost:8081/actuator/health
+curl --fail --silent http://localhost:8082/healthz
 ```
 
-Both commands must return `{"status":"UP"}`.
+The first two commands must return `{"status":"UP"}`; the dashboard health check returns `ok`.
 
 ## End-to-end session and analytics test
 

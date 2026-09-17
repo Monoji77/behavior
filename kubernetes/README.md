@@ -60,10 +60,11 @@ export KAFKA_OPTS="-Djava.security.auth.login.config=/tmp/kafka-client-jaas.conf
 ## 4. Deploy application services
 
 ```powershell
-kubectl apply -f .\kubernetes\behavior-services.yaml
+kubectl apply -k ./kubernetes
 kubectl rollout status deployment/ingestion-api -n behavior --timeout=180s
 kubectl rollout status deployment/stream-processor -n behavior --timeout=180s
 kubectl rollout status deployment/analytics-api -n behavior --timeout=180s
+kubectl rollout status deployment/dashboard -n behavior --timeout=180s
 ```
 
 The service images must be built into Docker Desktop before the final step.

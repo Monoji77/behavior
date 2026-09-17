@@ -2,15 +2,15 @@
 
 ## Normal changes
 
-Create a feature branch, open a pull request into main, and wait for all seven
-required checks: three Maven test jobs, three container build jobs, and deployment
+Create a feature branch, open a pull request into main, and wait for all nine
+required checks: three Maven test jobs, one dashboard test job, four container build jobs, and deployment
 manifest validation (which also tests promotion logic). Keep the PR up to date
 with main. Required checks apply to administrators too. A second reviewer is not
 required for this single-maintainer repository.
 
 PR builds have read-only token permissions and do not publish images or deploy.
 A separate main-only publishing job receives package write permission. After merge, CI tests again and
-publishes all three images with the full main commit SHA. The mutable latest tag
+publishes all four images with the full main commit SHA. The mutable latest tag
 is no longer published; deployment always uses SHA tags.
 
 ## Promotion
@@ -22,7 +22,7 @@ Promotion runs only after all main checks and image publications succeed:
 1. Fetch main and deploy/homelab.
 2. Skip if the build SHA is no longer the tip of main.
 3. Prepare a deployment commit containing the exact tested source snapshot,
-   with all three image tags set to the build SHA. This promotes configuration
+   with all four image tags set to the build SHA. This promotes configuration
    changes together with code, retaining the deployment branch's commit history.
 4. Fetch and check main again immediately before pushing.
 5. Push without force. On conflict, fetch and repeat, up to three attempts.

@@ -5,3 +5,4 @@ kind: Kustomization
 resources:
   - behavior-services.yaml
   - behavior-db-config.yaml
+  - dashboard.yaml

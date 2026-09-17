@@ -19,11 +19,13 @@ patches:
       metadata:
         name: analytics-api
         namespace: behavior
-# Promote a release by updating all three tags to the same published commit SHA.
+# Promote a release by updating all four tags to the same published commit SHA.
 images:
   - name: ghcr.io/monoji77/behavior-ingestion-api
     newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
   - name: ghcr.io/monoji77/behavior-stream-processor
     newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
   - name: ghcr.io/monoji77/behavior-analytics-api
+    newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
+  - name: ghcr.io/monoji77/behavior-dashboard
     newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
