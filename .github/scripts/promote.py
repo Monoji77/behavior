@@ -41,7 +41,7 @@ def promote(source):
         overlay = Path("gitops/behavior/kustomization.yaml")
         content = yaml.safe_load(overlay.read_text())
         images = content["images"]
-        for service in ("ingestion-api", "stream-processor", "analytics-api"):
+        for service in ("ingestion-api", "stream-processor", "analytics-api", "dashboard"):
             matches = [entry for entry in images
                        if entry.get("name") == f"ghcr.io/monoji77/behavior-{service}"]
             if len(matches) != 1:
