@@ -10,10 +10,10 @@ patches:
     metadata:\n  name: analytics-api\n  namespace: behavior"
 images:
 - name: ghcr.io/monoji77/behavior-ingestion-api
-  newTag: 141252e7e7a696f9958bbf7ccc01e6fe989fc4e3
+  newTag: cfa0732b22c92a72f3ec522d5c1724c982abfd36
 - name: ghcr.io/monoji77/behavior-stream-processor
-  newTag: 141252e7e7a696f9958bbf7ccc01e6fe989fc4e3
+  newTag: cfa0732b22c92a72f3ec522d5c1724c982abfd36
 - name: ghcr.io/monoji77/behavior-analytics-api
-  newTag: 141252e7e7a696f9958bbf7ccc01e6fe989fc4e3
+  newTag: cfa0732b22c92a72f3ec522d5c1724c982abfd36
 - name: ghcr.io/monoji77/behavior-dashboard
-  newTag: 141252e7e7a696f9958bbf7ccc01e6fe989fc4e3
+  newTag: cfa0732b22c92a72f3ec522d5c1724c982abfd36
