@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metricUrl, type Filters } from "./api";
+import { filterOptionsUrl, metricUrl, type Filters } from "./api";
 
 const filters: Filters = {
   deviceId: "phone-1",
@@ -21,5 +21,10 @@ describe("metricUrl", () => {
     expect(url.searchParams.get("granularity")).toBe("HOUR");
     expect(url.searchParams.get("from")).toBe(new Date(filters.from).toISOString());
     expect(url.searchParams.get("to")).toBe(new Date(filters.to).toISOString());
+  });
+
+  it("builds the real filter-options request with an optional device", () => {
+    expect(filterOptionsUrl()).toBe("/api/v1/metrics/filter-options");
+    expect(filterOptionsUrl("phone 1")).toBe("/api/v1/metrics/filter-options?deviceId=phone+1");
   });
 });
