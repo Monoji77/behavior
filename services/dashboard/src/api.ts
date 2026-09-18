@@ -38,6 +38,11 @@ export interface DashboardData {
   anomalies: AnomalyCount[];
 }
 
+export interface FilterOptions {
+  deviceIds: string[];
+  apps: string[];
+}
+
 interface LatestSessionResponse {
   session: LatestSession;
 }
@@ -81,6 +86,19 @@ async function getJson<T>(url: string): Promise<T> {
     throw new DashboardApiError(`Analytics API returned ${response.status}.`, response.status);
   }
   return response.json() as Promise<T>;
+}
+
+export function filterOptionsUrl(deviceId?: string): string {
+  const search = new URLSearchParams();
+  if (deviceId) {
+    search.set("deviceId", deviceId);
+  }
+  const query = search.toString();
+  return "/api/v1/metrics/filter-options" + (query ? "?" + query : "");
+}
+
+export function loadFilterOptions(deviceId?: string): Promise<FilterOptions> {
+  return getJson<FilterOptions>(filterOptionsUrl(deviceId));
 }
 
 export async function loadDashboard(filters: Filters): Promise<DashboardData> {

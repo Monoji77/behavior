@@ -67,6 +67,22 @@ public class AnalyticsRepository {
             GROUP BY anomaly_type
             ORDER BY anomaly_type ASC
             """;
+    private static final String FIND_DEVICE_IDS = """
+            SELECT DISTINCT device_id
+            FROM app_usage_rollups
+            ORDER BY device_id ASC
+            """;
+    private static final String FIND_APPS = """
+            SELECT DISTINCT app
+            FROM app_usage_rollups
+            ORDER BY app ASC
+            """;
+    private static final String FIND_APPS_FOR_DEVICE = """
+            SELECT DISTINCT app
+            FROM app_usage_rollups
+            WHERE device_id = ?
+            ORDER BY app ASC
+            """;
     private final JdbcTemplate jdbcTemplate;
 
     public AnalyticsRepository(JdbcTemplate jdbcTemplate) {
@@ -142,5 +158,17 @@ public class AnalyticsRepository {
                 Timestamp.from(from),
                 Timestamp.from(to)
         );
+    }
+
+    public List<String> findDeviceIds() {
+        return jdbcTemplate.queryForList(FIND_DEVICE_IDS, String.class);
+    }
+
+    public List<String> findApps(String deviceId) {
+        if (deviceId == null || deviceId.isBlank()) {
+            return jdbcTemplate.queryForList(FIND_APPS, String.class);
+        }
+
+        return jdbcTemplate.queryForList(FIND_APPS_FOR_DEVICE, String.class, deviceId);
     }
 }

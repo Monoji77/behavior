@@ -58,6 +58,16 @@ public class MetricsController {
         };
     }
 
+    @GetMapping("/filter-options")
+    public FilterOptionsResponse filterOptions(
+            @RequestParam(required = false) String deviceId
+    ) {
+        return new FilterOptionsResponse(
+                analyticsRepository.findDeviceIds(),
+                analyticsRepository.findApps(deviceId)
+        );
+    }
+
     private LatestSessionResponse latestSession(
             String metricName,
             String deviceId,
@@ -172,6 +182,12 @@ public class MetricsController {
             Instant to,
             long totalAnomalies,
             List<AnomalyCount> counts
+    ) {
+    }
+
+    public record FilterOptionsResponse(
+            List<String> deviceIds,
+            List<String> apps
     ) {
     }
 }
