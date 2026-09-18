@@ -172,4 +172,20 @@ class MetricsControllerTest {
                                 .param("app", "instagram"))
                                 .andExpect(status().isBadRequest());
         }
+
+        @Test
+        void returnsRealFilterOptionsAndNarrowsAppsByDevice() throws Exception {
+                when(analyticsRepository.findDeviceIds())
+                                .thenReturn(List.of("iphone-12", "pixel-9"));
+                when(analyticsRepository.findApps("iphone-12"))
+                                .thenReturn(List.of("instagram", "maps"));
+
+                mockMvc.perform(get("/api/v1/metrics/filter-options")
+                                .param("deviceId", "iphone-12"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.deviceIds[0]").value("iphone-12"))
+                                .andExpect(jsonPath("$.deviceIds[1]").value("pixel-9"))
+                                .andExpect(jsonPath("$.apps[0]").value("instagram"))
+                                .andExpect(jsonPath("$.apps[1]").value("maps"));
+        }
 }
