@@ -83,6 +83,11 @@ public class AnalyticsRepository {
             WHERE device_id = ?
             ORDER BY app ASC
             """;
+    private static final String FIND_EARLIEST_BUCKET_START_FOR_DEVICE = """
+            SELECT MIN(bucket_start) AS earliest_bucket_start
+            FROM app_usage_rollups
+            WHERE device_id = ?
+            """;
     private final JdbcTemplate jdbcTemplate;
 
     public AnalyticsRepository(JdbcTemplate jdbcTemplate) {
@@ -170,5 +175,15 @@ public class AnalyticsRepository {
         }
 
         return jdbcTemplate.queryForList(FIND_APPS_FOR_DEVICE, String.class, deviceId);
+    }
+
+    public Optional<Instant> findEarliestBucketStart(String deviceId) {
+        Timestamp earliest = jdbcTemplate.queryForObject(
+                FIND_EARLIEST_BUCKET_START_FOR_DEVICE,
+                Timestamp.class,
+                deviceId
+        );
+
+        return Optional.ofNullable(earliest).map(Timestamp::toInstant);
     }
 }
