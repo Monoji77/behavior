@@ -1,0 +1,25 @@
+# Template only. Copy to tailscale-oauth.local.yaml, replace both CHANGE_ME
+# values with the OAuth client id/secret from the Tailscale admin console
+# (Settings -> OAuth clients, scoped to tag:k3s-operator), then apply the
+# local file directly to the cluster:
+#
+#   kubectl apply -f kubernetes/tailscale-oauth.local.yaml
+#
+# The local copy is ignored by Git, same as behavior-secrets.local.yaml.
+# This lives in the "tailscale" namespace (not "behavior"), and is applied
+# manually rather than through Argo CD/kustomize, matching how the other
+# manually-managed infrastructure secrets in this repo are handled.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tailscale
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: operator-oauth
+  namespace: tailscale
+type: Opaque
+stringData:
+  client_id: CHANGE_ME_OAUTH_CLIENT_ID
+  client_secret: CHANGE_ME_OAUTH_CLIENT_SECRET
