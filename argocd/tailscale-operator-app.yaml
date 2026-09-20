@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tailscale-operator
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://pkgs.tailscale.com/helmcharts
+    chart: tailscale-operator
+    targetRevision: "1.102.4"
+    helm:
+      values: |
+        # OAuth client credentials are supplied out-of-band via a manually
+        # applied Secret named "operator-oauth" in the tailscale namespace
+        # (see kubernetes/tailscale-oauth.example.yaml) rather than here,
+        # so they never end up in Git or Argo CD's rendered manifests.
+        # oauth.clientId/clientSecret are left empty (the chart default),
+        # which requires that precreated Secret to exist before the
+        # operator Pod will start.
+        #
+        # operatorConfig.defaultTags and proxyConfig.defaultTags both
+        # override the chart defaults (tag:k8s-operator / tag:k8s) to
+        # their tag:k3s-operator / tag:k3s equivalents, since this
+        # cluster runs K3s rather than a generic/unspecified Kubernetes
+        # distribution. The timescaledb-tailscale Service further
+        # overrides its own proxy tag to tag:behavior-db via the
+        # tailscale.com/tags annotation.
+        #
+        # The OAuth client used below must be scoped to tag:k3s-operator
+        # (not tag:k8s-operator) in the Tailscale admin console.
+        oauth:
+          clientId: ""
+          clientSecret: ""
+        operatorConfig:
+          defaultTags:
+            - "tag:k3s-operator"
+        proxyConfig:
+          defaultTags: "tag:k3s"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tailscale
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
