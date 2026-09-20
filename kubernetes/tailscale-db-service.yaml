@@ -1,0 +1,27 @@
+# Manually managed, like timescaledb.yaml and namespace.yaml (see the
+# allowlist comment in kubernetes/kustomization.yaml) -- not synced by
+# Argo CD. Exposes TimescaleDB on the tailnet with a stable MagicDNS name
+# (behavior-db.<your-tailnet>.ts.net) via the Tailscale Kubernetes operator,
+# without changing the existing in-cluster "timescaledb" Service that
+# behavior-services.yaml's apps already depend on for POSTGRES_HOST.
+#
+# tag:behavior-db must be defined with owner tag:k3s-operator in the
+# tailnet's ACL policy (Access controls -> Definitions -> Tags) before
+# the operator can assign it to the device this Service provisions.
+apiVersion: v1
+kind: Service
+metadata:
+  name: timescaledb-tailscale
+  namespace: behavior
+  annotations:
+    tailscale.com/hostname: behavior-db
+    tailscale.com/tags: tag:behavior-db
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  selector:
+    app: timescaledb
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: postgresql
