@@ -5,7 +5,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import com.personalusageanalytics.processor.event.RawUsageEvent;
@@ -77,6 +77,7 @@ class SessionizationServiceTest {
         verify(sessionizationRepository).incrementDuplicateOpen(event);
         verify(sessionizationRepository).recordAnomaly(
                 event,
+                event.app(),
                 "DUPLICATE_OPEN",
                 activeOpenEventId
         );
@@ -86,10 +87,12 @@ class SessionizationServiceTest {
     void createsCompletedSessionForMatchingClose() {
         RawUsageEvent closeEvent = event(
                 OPENED_AT.plusMillis(1_649),
-                RawUsageEvent.EventType.CLOSE
+                RawUsageEvent.EventType.CLOSE,
+                null
         );
 
         ActiveSession activeSession = new ActiveSession(
+                "instagram",
                 UUID.randomUUID(),
                 OPENED_AT,
                 "unit-test",
@@ -97,8 +100,8 @@ class SessionizationServiceTest {
         );
 
         when(rawEventRepository.insert(closeEvent, 0, 10L)).thenReturn(true);
-        when(sessionizationRepository.removeActiveSession(closeEvent))
-                .thenReturn(Optional.of(activeSession));
+        when(sessionizationRepository.removeActiveSessions(closeEvent.deviceId()))
+                .thenReturn(List.of(activeSession));
         when(sessionizationRepository.createCompletedSession(
             activeSession,
             closeEvent,
@@ -115,9 +118,41 @@ class SessionizationServiceTest {
 
         verify(usageRollupService).recordCompletedSession(
             closeEvent.deviceId(),
-            closeEvent.app(),
+            activeSession.app(),
             activeSession.openedAt(),
             closeEvent.occurredAt()
+        );
+    }
+
+    @Test
+    void closesEveryActiveSessionForDeviceWithoutUsingCloseApp() {
+        RawUsageEvent closeEvent = event(
+                OPENED_AT.plusMillis(1_649),
+                RawUsageEvent.EventType.CLOSE,
+                null
+        );
+        ActiveSession instagram = new ActiveSession(
+                "instagram", UUID.randomUUID(), OPENED_AT, "unit-test", 0
+        );
+        ActiveSession telegram = new ActiveSession(
+                "telegram", UUID.randomUUID(), OPENED_AT, "unit-test", 0
+        );
+
+        when(rawEventRepository.insert(closeEvent, 0, 10L)).thenReturn(true);
+        when(sessionizationRepository.removeActiveSessions(closeEvent.deviceId()))
+                .thenReturn(List.of(instagram, telegram));
+        when(sessionizationRepository.createCompletedSession(
+                instagram, closeEvent, 1_649L)).thenReturn(true);
+        when(sessionizationRepository.createCompletedSession(
+                telegram, closeEvent, 1_649L)).thenReturn(true);
+
+        sessionizationService.process(closeEvent, 0, 10L);
+
+        verify(usageRollupService).recordCompletedSession(
+                closeEvent.deviceId(), "instagram", OPENED_AT, closeEvent.occurredAt()
+        );
+        verify(usageRollupService).recordCompletedSession(
+                closeEvent.deviceId(), "telegram", OPENED_AT, closeEvent.occurredAt()
         );
     }
 
@@ -125,17 +160,19 @@ class SessionizationServiceTest {
     void recordsUnmatchedCloseWhenNoActiveSessionExists() {
         RawUsageEvent closeEvent = event(
                 OPENED_AT,
-                RawUsageEvent.EventType.CLOSE
+                RawUsageEvent.EventType.CLOSE,
+                null
         );
 
         when(rawEventRepository.insert(closeEvent, 0, 10L)).thenReturn(true);
-        when(sessionizationRepository.removeActiveSession(closeEvent))
-                .thenReturn(Optional.empty());
+        when(sessionizationRepository.removeActiveSessions(closeEvent.deviceId()))
+                .thenReturn(List.of());
 
         sessionizationService.process(closeEvent, 0, 10L);
 
         verify(sessionizationRepository).recordAnomaly(
                 closeEvent,
+                null,
                 "UNMATCHED_CLOSE",
                 null
         );
@@ -145,10 +182,12 @@ class SessionizationServiceTest {
     void restoresActiveSessionForOutOfOrderClose() {
         RawUsageEvent closeEvent = event(
                 OPENED_AT.minusMillis(1),
-                RawUsageEvent.EventType.CLOSE
+                RawUsageEvent.EventType.CLOSE,
+                null
         );
 
         ActiveSession activeSession = new ActiveSession(
+                "instagram",
                 UUID.randomUUID(),
                 OPENED_AT,
                 "unit-test",
@@ -156,8 +195,8 @@ class SessionizationServiceTest {
         );
 
         when(rawEventRepository.insert(closeEvent, 0, 10L)).thenReturn(true);
-        when(sessionizationRepository.removeActiveSession(closeEvent))
-                .thenReturn(Optional.of(activeSession));
+        when(sessionizationRepository.removeActiveSessions(closeEvent.deviceId()))
+                .thenReturn(List.of(activeSession));
 
         sessionizationService.process(closeEvent, 0, 10L);
 
@@ -167,6 +206,7 @@ class SessionizationServiceTest {
         );
         verify(sessionizationRepository).recordAnomaly(
                 closeEvent,
+                activeSession.app(),
                 "OUT_OF_ORDER_CLOSE",
                 activeSession.openEventId()
         );
@@ -176,11 +216,19 @@ class SessionizationServiceTest {
             Instant occurredAt,
             RawUsageEvent.EventType eventType
     ) {
+        return event(occurredAt, eventType, "instagram");
+    }
+
+    private RawUsageEvent event(
+            Instant occurredAt,
+            RawUsageEvent.EventType eventType,
+            String app
+    ) {
         return new RawUsageEvent(
                 UUID.randomUUID(),
                 occurredAt,
                 eventType,
-                "instagram",
+                app,
                 "unit-test",
                 "iphone-test"
         );

@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: timescaledb-close-events-migration
+  namespace: behavior
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: postgres:17
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PGHOST
+              value: timescaledb
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: behavior-db-config
+                  key: POSTGRES_DB
+            - name: PGUSER
+              valueFrom:
+                configMapKeyRef:
+                  name: behavior-db-config
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: behavior-secrets
+                  key: POSTGRES_PASSWORD
+          command:
+            - sh
+            - -ec
+            - >-
+              psql --set=ON_ERROR_STOP=1 -c
+              'ALTER TABLE raw_app_events ALTER COLUMN app DROP NOT NULL;
+              ALTER TABLE app_usage_event_anomalies ALTER COLUMN app DROP NOT NULL;
+              ALTER TABLE app_usage_sessions
+              DROP CONSTRAINT IF EXISTS app_usage_sessions_close_event_id_key;'

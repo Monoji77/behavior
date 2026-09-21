@@ -1,7 +1,7 @@
 package com.personalusageanalytics.processor.service;
 
 import java.time.Duration;
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import com.personalusageanalytics.processor.event.RawUsageEvent;
@@ -58,6 +58,7 @@ public class SessionizationService {
 
             sessionizationRepository.recordAnomaly(
                     event,
+                    event.app(),
                     "DUPLICATE_OPEN",
                     activeOpenEventId
             );
@@ -65,20 +66,28 @@ public class SessionizationService {
     }
 
     private void processClose(RawUsageEvent event) {
-        Optional<ActiveSession> activeSession =
-                sessionizationRepository.removeActiveSession(event);
+        List<ActiveSession> activeSessions =
+                sessionizationRepository.removeActiveSessions(event.deviceId());
 
-        if (activeSession.isEmpty()) {
+        if (activeSessions.isEmpty()) {
             sessionizationRepository.recordAnomaly(
                     event,
+                    null,
                     "UNMATCHED_CLOSE",
                     null
             );
             return;
         }
 
-        ActiveSession active = activeSession.get();
+        for (ActiveSession active : activeSessions) {
+            processCloseForActiveSession(event, active);
+        }
+    }
 
+    private void processCloseForActiveSession(
+            RawUsageEvent event,
+            ActiveSession active
+    ) {
         long durationMilliseconds = Duration.between(
                 active.openedAt(),
                 event.occurredAt()
@@ -89,6 +98,7 @@ public class SessionizationService {
 
             sessionizationRepository.recordAnomaly(
                     event,
+                    active.app(),
                     "OUT_OF_ORDER_CLOSE",
                     active.openEventId()
             );
@@ -104,7 +114,7 @@ public class SessionizationService {
         if (completed) {
             usageRollupService.recordCompletedSession(
                     event.deviceId(),
-                    event.app(),
+                    active.app(),
                     active.openedAt(),
                     event.occurredAt()
             );
