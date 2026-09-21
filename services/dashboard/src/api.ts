@@ -1,4 +1,4 @@
-export type Granularity = "MINUTE" | "HOUR" | "DAY";
+export type Granularity = "HOUR" | "DAY";
 
 export interface Filters {
   deviceId: string;
