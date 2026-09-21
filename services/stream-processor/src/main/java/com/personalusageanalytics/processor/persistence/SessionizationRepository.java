@@ -2,7 +2,6 @@ package com.personalusageanalytics.processor.persistence;
 
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.List;
 
@@ -33,11 +32,10 @@ public class SessionizationRepository {
             RETURNING open_event_id
             """;
 
-    private static final String DELETE_ACTIVE_SESSION = """
+    private static final String DELETE_ACTIVE_SESSIONS = """
             DELETE FROM active_app_sessions
             WHERE device_id = ?
-              AND app = ?
-            RETURNING open_event_id, opened_at, source, duplicate_open_count
+            RETURNING app, open_event_id, opened_at, source, duplicate_open_count
             """;
 
     private static final String RESTORE_ACTIVE_SESSION = """
@@ -128,18 +126,18 @@ public class SessionizationRepository {
         );
     }
 
-    public Optional<ActiveSession> removeActiveSession(RawUsageEvent event) {
+    public List<ActiveSession> removeActiveSessions(String deviceId) {
         return jdbcTemplate.query(
-                DELETE_ACTIVE_SESSION,
+                DELETE_ACTIVE_SESSIONS,
                 (resultSet, rowNumber) -> new ActiveSession(
+                        resultSet.getString("app"),
                         resultSet.getObject("open_event_id", UUID.class),
                         resultSet.getTimestamp("opened_at").toInstant(),
                         resultSet.getString("source"),
                         resultSet.getInt("duplicate_open_count")
                 ),
-                event.deviceId(),
-                event.app()
-        ).stream().findFirst();
+                deviceId
+        );
     }
 
 
@@ -152,7 +150,7 @@ public class SessionizationRepository {
                 INSERT_COMPLETED_SESSION,
                 UUID.randomUUID(),
                 closeEvent.deviceId(),
-                closeEvent.app(),
+                activeSession.app(),
                 activeSession.source(),
                 activeSession.openEventId(),
                 closeEvent.eventId(),
@@ -165,6 +163,7 @@ public class SessionizationRepository {
 
     public void recordAnomaly(
             RawUsageEvent event,
+            String app,
             String anomalyType,
             UUID activeOpenEventId
     ) {
@@ -173,7 +172,7 @@ public class SessionizationRepository {
                 event.eventId(),
                 Timestamp.from(event.occurredAt()),
                 event.deviceId(),
-                event.app(),
+                app,
                 event.eventType().name(),
                 anomalyType,
                 activeOpenEventId
@@ -187,7 +186,7 @@ public class SessionizationRepository {
         jdbcTemplate.update(
                 RESTORE_ACTIVE_SESSION,
                 event.deviceId(),
-                event.app(),
+                activeSession.app(),
                 activeSession.openEventId(),
                 Timestamp.from(activeSession.openedAt()),
                 activeSession.source(),
@@ -223,6 +222,7 @@ public class SessionizationRepository {
         );
     }
     public record ActiveSession(
+            String app,
             UUID openEventId,
             Instant openedAt,
             String source,

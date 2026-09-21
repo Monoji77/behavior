@@ -5,4 +5,5 @@ kind: Kustomization
 resources:
   - behavior-services.yaml
   - behavior-db-config.yaml
+  - timescaledb-close-events-migration.yaml
   - dashboard.yaml

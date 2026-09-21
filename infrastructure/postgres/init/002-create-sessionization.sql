@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS app_usage_sessions (
     app VARCHAR(100) NOT NULL,
     source VARCHAR(100) NOT NULL,
     open_event_id UUID NOT NULL UNIQUE,
-    close_event_id UUID UNIQUE,
+    close_event_id UUID,
     opened_at TIMESTAMPTZ NOT NULL,
     closed_at TIMESTAMPTZ,
     duration_milliseconds BIGINT,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS app_usage_event_anomalies (
     event_id UUID PRIMARY KEY,
     occurred_at TIMESTAMPTZ NOT NULL,
     device_id VARCHAR(100) NOT NULL,
-    app VARCHAR(100) NOT NULL,
+    app VARCHAR(100),
     event_type VARCHAR(10) NOT NULL
         CHECK (event_type IN ('OPEN', 'CLOSE')),
     anomaly_type VARCHAR(40) NOT NULL

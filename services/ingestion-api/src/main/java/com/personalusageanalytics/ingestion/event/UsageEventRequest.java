@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -18,7 +20,6 @@ public record UsageEventRequest(
 
         @NotNull EventType eventType,
 
-        @NotBlank
         @Size(max = 100)
         @Pattern(regexp = "^(?=.*[A-Za-z0-9])[^\\p{Cntrl}]+$")
         String app,
@@ -37,6 +38,13 @@ public record UsageEventRequest(
         OPEN,
         CLOSE
     }
+
+    @JsonIgnore
+    @AssertTrue(message = "app is required for OPEN events")
+    public boolean isAppIncludedForOpenEvent() {
+        return eventType != EventType.OPEN || (app != null && !app.isBlank());
+    }
+
     public UsageEventRequest normalizedToMilliseconds() {
         return new UsageEventRequest(
                 eventId,
@@ -49,6 +57,10 @@ public record UsageEventRequest(
     }
 
     private static String normalizeIdentifier(String value) {
+        if (value == null) {
+            return null;
+        }
+
         return value
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "-")

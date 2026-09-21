@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS raw_app_events (
     occurred_at TIMESTAMPTZ NOT NULL,
     received_at TIMESTAMPTZ NOT NULL,
     event_type VARCHAR(10) NOT NULL CHECK (event_type IN ('OPEN', 'CLOSE')),
-    app VARCHAR(100) NOT NULL,
+    app VARCHAR(100),
     source VARCHAR(100) NOT NULL,
     device_id VARCHAR(100) NOT NULL,
     kafka_partition INTEGER,

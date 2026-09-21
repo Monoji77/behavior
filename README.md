@@ -45,6 +45,10 @@ The versioned contract is defined in [contracts/app-usage-event.v1.schema.json](
 }
 ```
 
+`app` is required for `OPEN` events. A `CLOSE` event omits `app`; the processor
+closes every active session for that device and retains each session's app in
+the completed-session history and rollups.
+
 Events are keyed by `deviceId` in Kafka so a device's events retain their order within a partition. The database uses `(event_id, occurred_at)` as its primary key because TimescaleDB unique constraints must include the time-partitioning column. Reprocessing the same Kafka record is therefore safe.
 
 ## Run locally

@@ -64,7 +64,7 @@ curl --fail-with-body --request POST http://localhost:8080/api/v1/events \
 curl --fail-with-body --request POST http://localhost:8080/api/v1/events \
   --header "X-Collector-Token: $token" \
   --header 'Content-Type: application/json' \
-  --data '{"eventId":"<close-event-uuid>","occurredAt":"2026-09-09T10:05:00Z","eventType":"CLOSE","app":"instagram","source":"local-session-test","deviceId":"session-test-001"}'
+  --data '{"eventId":"<close-event-uuid>","occurredAt":"2026-09-09T10:05:00Z","eventType":"CLOSE","source":"local-session-test","deviceId":"session-test-001"}'
 ```
 
 After a few seconds, request the completed session and usage rollups:
