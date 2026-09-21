@@ -128,9 +128,13 @@ class SessionizationPersistenceIntegrationTest {
                 openedAt.plusMillis(500),
                 RawUsageEvent.EventType.OPEN
         );
-        RawUsageEvent close = event(
+        RawUsageEvent close = new RawUsageEvent(
+                UUID.randomUUID(),
                 openedAt.plusMillis(1_649),
-                RawUsageEvent.EventType.CLOSE
+                RawUsageEvent.EventType.CLOSE,
+                null,
+                "integration-test",
+                "iphone-test"
         );
         RawUsageEvent unmatchedClose = event(
                 openedAt.plusMillis(2_000),
@@ -163,6 +167,15 @@ class SessionizationPersistenceIntegrationTest {
                 jdbcTemplate.queryForObject(
                         "SELECT duration_milliseconds FROM app_usage_sessions",
                         Long.class
+                )
+        );
+
+        assertEquals(
+                1,
+                jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM raw_app_events "
+                                + "WHERE event_type = 'CLOSE' AND app IS NULL",
+                        Integer.class
                 )
         );
 
@@ -223,6 +236,45 @@ class SessionizationPersistenceIntegrationTest {
         );
     }
 
+    @Test
+    void closesEveryActiveAppForDeviceWhenCloseOmitsApp() {
+        Instant openedAt = Instant.parse("2026-08-31T10:00:00Z");
+        RawUsageEvent instagram = event(
+                openedAt,
+                RawUsageEvent.EventType.OPEN,
+                "instagram"
+        );
+        RawUsageEvent telegram = event(
+                openedAt.plusSeconds(1),
+                RawUsageEvent.EventType.OPEN,
+                "telegram"
+        );
+        RawUsageEvent close = event(
+                openedAt.plusSeconds(5),
+                RawUsageEvent.EventType.CLOSE,
+                null
+        );
+
+        process(instagram, 0L);
+        process(telegram, 1L);
+        process(close, 2L);
+
+        assertEquals(
+                List.of("instagram", "telegram"),
+                jdbcTemplate.queryForList(
+                        "SELECT app FROM app_usage_sessions ORDER BY app",
+                        String.class
+                )
+        );
+        assertEquals(
+                0,
+                jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM active_app_sessions",
+                        Integer.class
+                )
+        );
+    }
+
     private void process(RawUsageEvent event, long kafkaOffset) {
         transactionTemplate.executeWithoutResult(
                 status -> sessionizationService.process(event, 0, kafkaOffset)
@@ -233,11 +285,19 @@ class SessionizationPersistenceIntegrationTest {
             Instant occurredAt,
             RawUsageEvent.EventType eventType
     ) {
+        return event(occurredAt, eventType, "instagram");
+    }
+
+    private RawUsageEvent event(
+            Instant occurredAt,
+            RawUsageEvent.EventType eventType,
+            String app
+    ) {
         return new RawUsageEvent(
                 UUID.randomUUID(),
                 occurredAt,
                 eventType,
-                "instagram",
+                app,
                 "integration-test",
                 "iphone-test"
         );

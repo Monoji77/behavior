@@ -3,14 +3,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:personal-usage-streaming-analytics:contracts:app-usage-event:v1",
   "title": "App Usage Event v1",
-  "description": "A single application open or close event emitted by a collector.",
+  "description": "A single application open or close event emitted by a collector. OPEN events identify the app; CLOSE events close every active session for the device.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "eventId",
     "occurredAt",
     "eventType",
-    "app",
     "source",
     "deviceId"
   ],
@@ -31,19 +30,30 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 100,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+      "description": "Required for OPEN events. CLOSE events infer apps from active sessions for the device.",
+      "pattern": "^(?=.*[A-Za-z0-9])[^\\r\\n]+$"
     },
     "source": {
       "type": "string",
       "minLength": 1,
       "maxLength": 100,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+      "pattern": "^(?=.*[A-Za-z0-9])[^\\r\\n]+$"
     },
     "deviceId": {
       "type": "string",
       "minLength": 1,
       "maxLength": 100,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+      "pattern": "^(?=.*[A-Za-z0-9])[^\\r\\n]+$"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "eventType": { "const": "OPEN" }
+        }
+      },
+      "then": { "required": ["app"] }
+    }
+  ]
 }
