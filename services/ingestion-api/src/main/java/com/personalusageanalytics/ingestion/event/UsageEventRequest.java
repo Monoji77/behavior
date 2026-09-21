@@ -1,6 +1,7 @@
 package com.personalusageanalytics.ingestion.event;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 import jakarta.validation.constraints.NotBlank;
@@ -19,7 +20,7 @@ public record UsageEventRequest(
 
         @NotBlank
         @Size(max = 100)
-        @Pattern(regexp = "^[a-z0-9][a-z0-9._-]*$")
+        @Pattern(regexp = "^[A-Za-z0-9][A-Za-z0-9._-]*$")
         String app,
 
         @NotBlank
@@ -41,7 +42,7 @@ public record UsageEventRequest(
                 eventId,
                 occurredAt.truncatedTo(ChronoUnit.MILLIS),
                 eventType,
-                app,
+                app.toLowerCase(Locale.ROOT),
                 source,
                 deviceId
         );
