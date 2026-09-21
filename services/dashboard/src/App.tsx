@@ -36,12 +36,16 @@ function Combobox({ label, value, onChange, options, placeholder, loading }: { l
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
   const [filtering, setFiltering] = useState(false);
+  const closeTimer = useRef<number | undefined>(undefined);
   const listId = useId();
   useEffect(() => setQuery(value), [value]);
+  useEffect(() => () => { if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current); }, []);
   const matches = filtering ? options.filter((item) => item.toLocaleLowerCase().includes(query.toLocaleLowerCase())) : options;
-  const close = () => window.setTimeout(() => { setOpen(false); setQuery(value); setFiltering(false); }, 120);
-  return <label className="filter-pill combo-pill"><span>{label}</span><div className="combo-wrap"><input required role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} value={query} onFocus={() => { setOpen(true); setFiltering(false); }} onBlur={close} onChange={(event) => { setQuery(event.target.value); setOpen(true); setFiltering(true); }} placeholder={placeholder} /> <Chevron />
-    {open && <ul id={listId} role="listbox" className="option-list">{loading ? <li className="no-match">Loading available {label.toLocaleLowerCase()}s…</li> : matches.length ? matches.map((item) => <li key={item} role="option" aria-selected={item === value} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(item); setQuery(item); setOpen(false); setFiltering(false); }}>{item}</li>) : <li className="no-match">No matching {label.toLocaleLowerCase()} found</li>}</ul>}
+  const cancelClose = () => { if (closeTimer.current !== undefined) { window.clearTimeout(closeTimer.current); closeTimer.current = undefined; } };
+  const close = () => { cancelClose(); closeTimer.current = window.setTimeout(() => { setOpen(false); setQuery(value); setFiltering(false); closeTimer.current = undefined; }, 120); };
+  const select = (item: string) => { cancelClose(); onChange(item); setQuery(item); setOpen(false); setFiltering(false); };
+  return <label className="filter-pill combo-pill"><span>{label}</span><div className="combo-wrap"><input required role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} value={query} onFocus={() => { cancelClose(); setOpen(true); setFiltering(false); }} onBlur={close} onChange={(event) => { setQuery(event.target.value); setOpen(true); setFiltering(true); }} placeholder={placeholder} /> <Chevron />
+    {open && <ul id={listId} role="listbox" className="option-list">{loading ? <li className="no-match">Loading available {label.toLocaleLowerCase()}s…</li> : matches.length ? matches.map((item) => <li key={item} role="option" aria-selected={item === value} onPointerDown={(event) => event.preventDefault()} onClick={() => select(item)}>{item}</li>) : <li className="no-match">No matching {label.toLocaleLowerCase()} found</li>}</ul>}
   </div></label>;
 }
 
