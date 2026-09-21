@@ -23,8 +23,9 @@ describe("metricUrl", () => {
     expect(url.searchParams.get("to")).toBe(new Date(filters.to).toISOString());
   });
 
-  it("builds the real filter-options request with an optional device", () => {
+  it("builds the real filter-options request with an optional device and app", () => {
     expect(filterOptionsUrl()).toBe("/api/v1/metrics/filter-options");
     expect(filterOptionsUrl("phone 1")).toBe("/api/v1/metrics/filter-options?deviceId=phone+1");
+    expect(filterOptionsUrl("phone 1", "instagram")).toBe("/api/v1/metrics/filter-options?deviceId=phone+1&app=instagram");
   });
 });

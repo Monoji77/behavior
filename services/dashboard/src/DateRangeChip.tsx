@@ -1,4 +1,4 @@
-import { getLocalTimeZone, parseDate, today, type CalendarDate } from "@internationalized/date";
+import { getLocalTimeZone, parseDate, today, type CalendarDate, type DateValue } from "@internationalized/date";
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -12,8 +12,8 @@ import {
 } from "react-aria-components";
 
 const dayFromDateTime = (value: string) => value.slice(0, 10);
-const dateTimeWithDay = (day: CalendarDate, existing: string, endOfDay = false) =>
-  day.toString() + "T" + (existing.slice(11) || (endOfDay ? "23:59" : "00:00"));
+const dateTimeWithDay = (day: CalendarDate, endOfDay: boolean) =>
+  day.toString() + "T" + (endOfDay ? "23:59" : "00:00");
 const formatDay = (value: string) =>
   new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(dayFromDateTime(value) + "T12:00:00"));
 const localDay = (isoInstant: string) => {
@@ -28,7 +28,7 @@ function RangeCell({ date, maxValue }: { date: CalendarDate; maxValue: CalendarD
   return (
     <CalendarCell
       date={date}
-      className={({ isSelected, isSelectionStart, isSelectionEnd, isFocusVisible, isDisabled, isOutsideMonth }) =>
+      className={({ isSelected, isSelectionStart, isSelectionEnd, isFocusVisible, isDisabled, isOutsideMonth, isUnavailable }) =>
         [
           "rc-cell",
           isSelected && "rc-cell--selected",
@@ -36,6 +36,7 @@ function RangeCell({ date, maxValue }: { date: CalendarDate; maxValue: CalendarD
           isSelectionEnd && "rc-cell--end",
           isFocusVisible && "rc-cell--focus",
           isDisabled && "rc-cell--disabled",
+          isUnavailable && "rc-cell--unavailable",
           isOutsideMonth && "rc-cell--outside",
         ].filter(Boolean).join(" ")
       }
@@ -59,15 +60,18 @@ interface DateRangeChipProps {
   from: string;
   to: string;
   earliestUsageAt: string | null;
+  availableDates: string[];
   onChange: (from: string, to: string) => void;
 }
 
-export function DateRangeChip({ from, to, earliestUsageAt, onChange }: DateRangeChipProps) {
+export function DateRangeChip({ from, to, earliestUsageAt, availableDates, onChange }: DateRangeChipProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const maxValue = today(getLocalTimeZone()).add({ days: 7 });
   const minValue = earliestUsageAt ? parseDate(localDay(earliestUsageAt)) : undefined;
   const value = { start: parseDate(dayFromDateTime(from)), end: parseDate(dayFromDateTime(to)) };
+  const availableDaySet = new Set(availableDates);
+  const isDateUnavailable = (date: DateValue) => availableDaySet.size > 0 && !availableDaySet.has(date.toString());
 
   useEffect(() => {
     if (!open) return;
@@ -92,9 +96,10 @@ export function DateRangeChip({ from, to, earliestUsageAt, onChange }: DateRange
             value={value}
             minValue={minValue}
             maxValue={maxValue}
+            isDateUnavailable={isDateUnavailable}
             onChange={(range) => {
               if (!range) return;
-              onChange(dateTimeWithDay(range.start as CalendarDate, from), dateTimeWithDay(range.end as CalendarDate, to, true));
+              onChange(dateTimeWithDay(range.start as CalendarDate, false), dateTimeWithDay(range.end as CalendarDate, true));
               setOpen(false);
             }}
           >

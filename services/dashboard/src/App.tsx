@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useId, useMemo, useState } from "react";
+import { type FormEvent, type MouseEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { type DashboardData, type Filters, type Granularity, type FilterOptions, loadDashboard, loadFilterOptions } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
@@ -31,12 +31,13 @@ function Metric({ label, value, detail, icon, tone = "violet" }: { label: string
 function Combobox({ label, value, onChange, options, placeholder, loading }: { label: string; value: string; onChange: (value: string) => void; options: string[]; placeholder: string; loading: boolean }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
+  const [filtering, setFiltering] = useState(false);
   const listId = useId();
   useEffect(() => setQuery(value), [value]);
-  const matches = options.filter((item) => item.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
-  const close = () => window.setTimeout(() => { setOpen(false); setQuery(value); }, 120);
-  return <label className="filter-pill combo-pill"><span>{label}</span><div className="combo-wrap"><input required role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} value={query} onFocus={() => setOpen(true)} onBlur={close} onChange={(event) => { setQuery(event.target.value); setOpen(true); }} placeholder={placeholder} /> <Chevron />
-    {open && <ul id={listId} role="listbox" className="option-list">{loading ? <li className="no-match">Loading available {label.toLocaleLowerCase()}s…</li> : matches.length ? matches.map((item) => <li key={item} role="option" aria-selected={item === value} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(item); setQuery(item); setOpen(false); }}>{item}</li>) : <li className="no-match">No matching {label.toLocaleLowerCase()} found</li>}</ul>}
+  const matches = filtering ? options.filter((item) => item.toLocaleLowerCase().includes(query.toLocaleLowerCase())) : options;
+  const close = () => window.setTimeout(() => { setOpen(false); setQuery(value); setFiltering(false); }, 120);
+  return <label className="filter-pill combo-pill"><span>{label}</span><div className="combo-wrap"><input required role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} value={query} onFocus={() => { setOpen(true); setFiltering(false); }} onBlur={close} onChange={(event) => { setQuery(event.target.value); setOpen(true); setFiltering(true); }} placeholder={placeholder} /> <Chevron />
+    {open && <ul id={listId} role="listbox" className="option-list">{loading ? <li className="no-match">Loading available {label.toLocaleLowerCase()}s…</li> : matches.length ? matches.map((item) => <li key={item} role="option" aria-selected={item === value} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(item); setQuery(item); setOpen(false); setFiltering(false); }}>{item}</li>) : <li className="no-match">No matching {label.toLocaleLowerCase()} found</li>}</ul>}
   </div></label>;
 }
 
@@ -47,6 +48,8 @@ const axisLabel = (value: string, granularity: Granularity) => {
 };
 
 function Trend({ data, granularity }: { data: DashboardData["rollups"]; granularity: Granularity }) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [hover, setHover] = useState<{ index: number; leftPct: number; topPct: number } | null>(null);
   if (!data.length) return <div className="chart-empty">No activity was recorded for this range.</div>;
   const max = Math.max(...data.map(({ usageMilliseconds }) => usageMilliseconds), 1);
   const width = 700, height = 230, left = 48, right = 16, top = 16, bottom = 40;
@@ -56,13 +59,36 @@ function Trend({ data, granularity }: { data: DashboardData["rollups"]; granular
   const area = left + "," + (height - bottom) + " " + points + " " + (width - right) + "," + (height - bottom);
   const labelled = data.filter((_, index) => index === 0 || index === data.length - 1 || index % Math.ceil(data.length / 5) === 0);
   const yTicks = [0, .25, .5, .75, 1];
-  return <div className="trend-wrap"><svg className="trend" viewBox={[0, 0, width, height].join(" ")} role="img" aria-label="Usage trend, time in minutes">
-    {yTicks.map((ratio) => <line key={ratio} className="gridline" x1={left} x2={width - right} y1={y(max * ratio)} y2={y(max * ratio)} />)}
-    {yTicks.map((ratio) => <text key={ratio} className="axis y-axis" textAnchor="end" x={left - 8} y={y(max * ratio) + 4}>{Math.round((max * ratio) / 60_000)}m</text>)}
-    <polygon className="trend-area" points={area} /><polyline className="trend-line" points={points} />
-    {data.map((bucket, index) => <circle key={bucket.bucketStart} className="trend-point" cx={x(index)} cy={y(bucket.usageMilliseconds)} r="3" />)}
-    {labelled.map((bucket) => { const index = data.indexOf(bucket); return <text key={bucket.bucketStart} className="axis" textAnchor="middle" x={x(index)} y={height - 10}>{axisLabel(bucket.bucketStart, granularity)}</text>; })}
-  </svg><div className="chart-key"><span><i /> Usage time (minutes)</span><span>Peak: {duration(max)}</span></div></div>;
+  const onMove = (event: MouseEvent<HTMLDivElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const relX = event.clientX - rect.left;
+    const svgX = (relX / rect.width) * width;
+    let nearest = 0, bestDistance = Infinity;
+    data.forEach((_, index) => {
+      const distance = Math.abs(x(index) - svgX);
+      if (distance < bestDistance) { bestDistance = distance; nearest = index; }
+    });
+    setHover({ index: nearest, leftPct: (relX / rect.width) * 100, topPct: ((event.clientY - rect.top) / rect.height) * 100 });
+  };
+  const hovered = hover ? data[hover.index] : null;
+  return <div className="trend-wrap">
+    <div className="trend-canvas" ref={canvasRef} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+      <svg className="trend" viewBox={[0, 0, width, height].join(" ")} preserveAspectRatio="none" role="img" aria-label="Usage trend, time in minutes">
+        {yTicks.map((ratio) => <line key={ratio} className="gridline" x1={left} x2={width - right} y1={y(max * ratio)} y2={y(max * ratio)} />)}
+        {yTicks.map((ratio) => <text key={ratio} className="axis y-axis" textAnchor="end" x={left - 8} y={y(max * ratio) + 4}>{Math.round((max * ratio) / 60_000)}m</text>)}
+        <polygon className="trend-area" points={area} /><polyline className="trend-line" points={points} />
+        {data.map((bucket, index) => <circle key={bucket.bucketStart} className="trend-point" cx={x(index)} cy={y(bucket.usageMilliseconds)} r="3" />)}
+        {labelled.map((bucket) => { const index = data.indexOf(bucket); return <text key={bucket.bucketStart} className="axis" textAnchor="middle" x={x(index)} y={height - 10}>{axisLabel(bucket.bucketStart, granularity)}</text>; })}
+        {hovered && <line className="trend-hover-line" x1={x(hover!.index)} x2={x(hover!.index)} y1={top} y2={height - bottom} />}
+        {hovered && <circle className="trend-hover-dot" cx={x(hover!.index)} cy={y(hovered.usageMilliseconds)} r="5" />}
+      </svg>
+      <div className={"trend-tooltip" + (hovered ? " trend-tooltip--visible" : "")} style={hover ? { left: hover.leftPct + "%", top: hover.topPct + "%" } : undefined}>
+        {hovered && <><strong>{duration(hovered.usageMilliseconds)}</strong><span>{axisLabel(hovered.bucketStart, granularity)}</span></>}
+      </div>
+    </div>
+    <div className="chart-key"><span><i /> Usage time (minutes)</span><span>Peak: {duration(max)}</span></div>
+  </div>;
 }
 
 function App() {
@@ -70,7 +96,7 @@ function App() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null });
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [] });
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
@@ -81,17 +107,23 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     setOptionsLoading(true);
-    loadFilterOptions(filters.deviceId)
+    loadFilterOptions(filters.deviceId, filters.app)
       .then((options) => { if (!cancelled) setFilterOptions(options); })
       .catch(() => { if (!cancelled) setFilterOptions((current) => filters.deviceId ? { ...current, apps: [] } : current); })
       .finally(() => { if (!cancelled) setOptionsLoading(false); });
     return () => { cancelled = true; };
-  }, [filters.deviceId]);
+  }, [filters.deviceId, filters.app]);
   useEffect(() => {
     if (filters.app && !filterOptions.apps.includes(filters.app)) {
       update("app", "");
     }
   }, [filterOptions.apps, filters.app]);
+  useEffect(() => {
+    if (filters.deviceId && filters.app) {
+      submit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.deviceId, filters.app, filters.from, filters.to, filters.granularity]);
   function toggleTheme() { setSparkle(true); setTheme((current) => current === "dark" ? "light" : "dark"); window.setTimeout(() => setSparkle(false), 520); }
   async function submit(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault(); setRefreshStatus("loading"); setError(null);
@@ -115,10 +147,13 @@ function App() {
         <RefreshButton status={refreshStatus} />
       </form></section>
       {error && <p className="error" role="alert">{error}</p>}
-      <section id="overview" className="metrics" aria-label="Usage summary"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric label="Usage buckets" value={data ? data.rollups.length : "—"} detail={data ? filters.granularity.toLowerCase() + " intervals" : "Awaiting activity"} icon="⌁" tone="sky" /><Metric label="Latest session" value={data ? duration(data.latestSession?.durationMilliseconds) : "—"} detail={data?.latestSession?.status ?? "Awaiting activity"} icon="▣" tone="amber" /><Metric label="Anomalies" value={data ? data.totalAnomalies : "—"} detail={data ? (data.totalAnomalies ? "Needs review" : "All clear") : "No range selected"} icon="△" tone="rose" /></section>
-      <section id="activity" className="dashboard-grid"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
+      <section id="overview" className="overview-row" aria-label="Usage summary">
+        <article className="panel report report-card"><p className="eyebrow">Current report</p><h2>{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p><div><span>Range</span><strong>{formatDay(filters.from)} – {formatDay(filters.to)}</strong></div></article>
+        <div className="metrics"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric label="Usage buckets" value={data ? data.rollups.length : "—"} detail={data ? filters.granularity.toLowerCase() + " intervals" : "Awaiting activity"} icon="⌁" tone="sky" /><Metric label="Latest session" value={data ? duration(data.latestSession?.durationMilliseconds) : "—"} detail={data?.latestSession?.status ?? "Awaiting activity"} icon="▣" tone="amber" /><Metric label="Anomalies" value={data ? data.totalAnomalies : "—"} detail={data ? (data.totalAnomalies ? "Needs review" : "All clear") : "No range selected"} icon="△" tone="rose" /></div>
+      </section>
+      <section id="activity" className="dashboard-grid"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
         <article id="session" className="panel session"><header><div><p className="eyebrow">Most recent</p><h2>Latest session</h2></div><span className="session-icon">◷</span></header>{data?.latestSession ? <><strong className="session-time">{duration(data.latestSession.durationMilliseconds)}</strong><span className="session-state">{data.latestSession.status}</span><dl><div><dt>Opened</dt><dd>{time(data.latestSession.openedAt)}</dd></div><div><dt>Closed</dt><dd>{time(data.latestSession.closedAt)}</dd></div><div><dt>Source</dt><dd>{data.latestSession.source}</dd></div></dl></> : <Empty title="No session loaded" text="Choose a device and app to see its latest completed session." />}</article></section>
-      <section id="anomalies" className="dashboard-grid lower"><article className="panel anomalies"><header><div><p className="eyebrow">Data quality</p><h2>Processing anomalies</h2></div><span className={data?.totalAnomalies ? "pill risk" : "pill clear"}>{data?.totalAnomalies ? "Review" : "Clear"}</span></header>{data?.anomalies.length ? <ul>{data.anomalies.map((item) => <li key={item.anomalyType}><span>{item.anomalyType}</span><strong>{item.count}</strong></li>)}</ul> : <Empty title={data ? "No anomalies found" : "No report loaded"} text={data ? "This range processed without flagged events." : "An anomaly summary will appear with your report."} />}</article><article className="panel report"><p className="eyebrow">Current report</p><h2>{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p><div><span>Range</span><strong>{formatDay(filters.from)} – {formatDay(filters.to)}</strong></div></article></section>
+      <section id="anomalies" className="lower"><article className="panel anomalies"><header><div><p className="eyebrow">Data quality</p><h2>Processing anomalies</h2></div><span className={data?.totalAnomalies ? "pill risk" : "pill clear"}>{data?.totalAnomalies ? "Review" : "Clear"}</span></header>{data?.anomalies.length ? <ul>{data.anomalies.map((item) => <li key={item.anomalyType}><span>{item.anomalyType}</span><strong>{item.count}</strong></li>)}</ul> : <Empty title={data ? "No anomalies found" : "No report loaded"} text={data ? "This range processed without flagged events." : "An anomaly summary will appear with your report."} />}</article></section>
     </main></div>;
 }
 function Empty({ title, text }: { title: string; text: string }) { return <div className="empty"><strong>{title}</strong><p>{text}</p></div>; }
