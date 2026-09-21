@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.List;
@@ -180,7 +181,7 @@ class MetricsControllerTest {
                                 .thenReturn(List.of("iphone-12", "pixel-9"));
                 when(analyticsRepository.findApps("iphone-12"))
                                 .thenReturn(List.of("instagram", "maps"));
-                when(analyticsRepository.findEarliestBucketStart("iphone-12"))
+                when(analyticsRepository.findEarliestBucketStart("iphone-12", null))
                                 .thenReturn(Optional.of(Instant.parse("2026-08-01T00:00:00Z")));
 
                 mockMvc.perform(get("/api/v1/metrics/filter-options")
@@ -194,6 +195,44 @@ class MetricsControllerTest {
         }
 
         @Test
+        void returnsAvailableDatesForTheSelectedDeviceAndApp() throws Exception {
+                when(analyticsRepository.findDeviceIds())
+                                .thenReturn(List.of("iphone-12"));
+                when(analyticsRepository.findApps("iphone-12"))
+                                .thenReturn(List.of("instagram"));
+                when(analyticsRepository.findEarliestBucketStart("iphone-12", "instagram"))
+                                .thenReturn(Optional.of(Instant.parse("2026-09-02T00:00:00Z")));
+                when(analyticsRepository.findAvailableDates("iphone-12", "instagram"))
+                                .thenReturn(List.of(
+                                                LocalDate.parse("2026-09-02"),
+                                                LocalDate.parse("2026-09-08")));
+
+                mockMvc.perform(get("/api/v1/metrics/filter-options")
+                                .param("deviceId", "iphone-12")
+                                .param("app", "instagram"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.availableDates.length()").value(2))
+                                .andExpect(jsonPath("$.availableDates[0]").value("2026-09-02"))
+                                .andExpect(jsonPath("$.availableDates[1]").value("2026-09-08"));
+        }
+
+        @Test
+        void narrowsEarliestUsageToTheSelectedApp() throws Exception {
+                when(analyticsRepository.findDeviceIds())
+                                .thenReturn(List.of("iphone-12"));
+                when(analyticsRepository.findApps("iphone-12"))
+                                .thenReturn(List.of("instagram", "maps"));
+                when(analyticsRepository.findEarliestBucketStart("iphone-12", "maps"))
+                                .thenReturn(Optional.of(Instant.parse("2026-09-01T00:00:00Z")));
+
+                mockMvc.perform(get("/api/v1/metrics/filter-options")
+                                .param("deviceId", "iphone-12")
+                                .param("app", "maps"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.earliestUsageAt").value("2026-09-01T00:00:00Z"));
+        }
+
+        @Test
         void omitsEarliestUsageWhenNoDeviceIsSelected() throws Exception {
                 when(analyticsRepository.findDeviceIds())
                                 .thenReturn(List.of("iphone-12", "pixel-9"));
@@ -202,6 +241,7 @@ class MetricsControllerTest {
 
                 mockMvc.perform(get("/api/v1/metrics/filter-options"))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.earliestUsageAt").value(nullValue()));
+                                .andExpect(jsonPath("$.earliestUsageAt").value(nullValue()))
+                                .andExpect(jsonPath("$.availableDates.length()").value(0));
         }
 }
