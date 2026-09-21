@@ -62,9 +62,14 @@ public class MetricsController {
     public FilterOptionsResponse filterOptions(
             @RequestParam(required = false) String deviceId
     ) {
+        Instant earliestUsageAt = (deviceId == null || deviceId.isBlank())
+                ? null
+                : analyticsRepository.findEarliestBucketStart(deviceId).orElse(null);
+
         return new FilterOptionsResponse(
                 analyticsRepository.findDeviceIds(),
-                analyticsRepository.findApps(deviceId)
+                analyticsRepository.findApps(deviceId),
+                earliestUsageAt
         );
     }
 
@@ -187,7 +192,8 @@ public class MetricsController {
 
     public record FilterOptionsResponse(
             List<String> deviceIds,
-            List<String> apps
+            List<String> apps,
+            Instant earliestUsageAt
     ) {
     }
 }
