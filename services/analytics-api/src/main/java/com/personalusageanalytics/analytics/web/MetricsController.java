@@ -1,6 +1,7 @@
 package com.personalusageanalytics.analytics.web;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 import com.personalusageanalytics.analytics.model.AnomalyCount;
@@ -60,16 +61,22 @@ public class MetricsController {
 
     @GetMapping("/filter-options")
     public FilterOptionsResponse filterOptions(
-            @RequestParam(required = false) String deviceId
+            @RequestParam(required = false) String deviceId,
+            @RequestParam(required = false) String app
     ) {
         Instant earliestUsageAt = (deviceId == null || deviceId.isBlank())
                 ? null
-                : analyticsRepository.findEarliestBucketStart(deviceId).orElse(null);
+                : analyticsRepository.findEarliestBucketStart(deviceId, app).orElse(null);
+
+        List<LocalDate> availableDates = (deviceId == null || deviceId.isBlank())
+                ? List.of()
+                : analyticsRepository.findAvailableDates(deviceId, app);
 
         return new FilterOptionsResponse(
                 analyticsRepository.findDeviceIds(),
                 analyticsRepository.findApps(deviceId),
-                earliestUsageAt
+                earliestUsageAt,
+                availableDates
         );
     }
 
@@ -193,7 +200,8 @@ public class MetricsController {
     public record FilterOptionsResponse(
             List<String> deviceIds,
             List<String> apps,
-            Instant earliestUsageAt
+            Instant earliestUsageAt,
+            List<LocalDate> availableDates
     ) {
     }
 }
