@@ -13,14 +13,14 @@ import org.junit.jupiter.api.Test;
 class UsageEventRequestTest {
 
     @Test
-    void acceptsMixedCaseAppNamesAndNormalizesToMillisecondsAndLowercase() {
+    void acceptsFriendlyShortcutIdentifiersAndNormalizesThemToStableSlugs() {
         UsageEventRequest event = new UsageEventRequest(
                 UUID.randomUUID(),
                 Instant.parse("2026-08-31T06:24:00.123456789Z"),
                 UsageEventRequest.EventType.OPEN,
-                "Instagram",
-                "unit-test",
-                "iphone-test"
+                "Google Maps",
+                "iPhone-Shortcut",
+                "iPhone 16 Pro [Personal]"
         );
 
         assertTrue(Validation.buildDefaultValidatorFactory().getValidator()
@@ -33,8 +33,9 @@ class UsageEventRequestTest {
                 Instant.parse("2026-08-31T06:24:00.123Z"),
                 normalized.occurredAt()
         );
-        assertEquals("instagram", normalized.app());
+        assertEquals("google-maps", normalized.app());
+        assertEquals("iphone-shortcut", normalized.source());
+        assertEquals("iphone-16-pro-personal", normalized.deviceId());
         assertEquals(event.eventId(), normalized.eventId());
-        assertEquals(event.deviceId(), normalized.deviceId());
     }
 }

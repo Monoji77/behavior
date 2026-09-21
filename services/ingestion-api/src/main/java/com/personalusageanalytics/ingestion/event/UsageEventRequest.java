@@ -20,17 +20,17 @@ public record UsageEventRequest(
 
         @NotBlank
         @Size(max = 100)
-        @Pattern(regexp = "^[A-Za-z0-9][A-Za-z0-9._-]*$")
+        @Pattern(regexp = "^(?=.*[A-Za-z0-9])[^\\p{Cntrl}]+$")
         String app,
 
         @NotBlank
         @Size(max = 100)
-        @Pattern(regexp = "^[a-z0-9][a-z0-9._-]*$")
+        @Pattern(regexp = "^(?=.*[A-Za-z0-9])[^\\p{Cntrl}]+$")
         String source,
 
         @NotBlank
         @Size(max = 100)
-        @Pattern(regexp = "^[a-z0-9][a-z0-9._-]*$")
+        @Pattern(regexp = "^(?=.*[A-Za-z0-9])[^\\p{Cntrl}]+$")
         String deviceId
     ) {
     public enum EventType {
@@ -42,9 +42,16 @@ public record UsageEventRequest(
                 eventId,
                 occurredAt.truncatedTo(ChronoUnit.MILLIS),
                 eventType,
-                app.toLowerCase(Locale.ROOT),
-                source,
-                deviceId
+                normalizeIdentifier(app),
+                normalizeIdentifier(source),
+                normalizeIdentifier(deviceId)
         );
+    }
+
+    private static String normalizeIdentifier(String value) {
+        return value
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("^-+|-+$", "");
     }
 }
