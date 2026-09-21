@@ -42,6 +42,7 @@ export interface FilterOptions {
   deviceIds: string[];
   apps: string[];
   earliestUsageAt: string | null;
+  availableDates: string[];
 }
 
 interface LatestSessionResponse {
@@ -89,17 +90,20 @@ async function getJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function filterOptionsUrl(deviceId?: string): string {
+export function filterOptionsUrl(deviceId?: string, app?: string): string {
   const search = new URLSearchParams();
   if (deviceId) {
     search.set("deviceId", deviceId);
+  }
+  if (app) {
+    search.set("app", app);
   }
   const query = search.toString();
   return "/api/v1/metrics/filter-options" + (query ? "?" + query : "");
 }
 
-export function loadFilterOptions(deviceId?: string): Promise<FilterOptions> {
-  return getJson<FilterOptions>(filterOptionsUrl(deviceId));
+export function loadFilterOptions(deviceId?: string, app?: string): Promise<FilterOptions> {
+  return getJson<FilterOptions>(filterOptionsUrl(deviceId, app));
 }
 
 export async function loadDashboard(filters: Filters): Promise<DashboardData> {

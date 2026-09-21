@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.List;
 import java.time.Instant;
+import java.time.LocalDate;
 
 
 import com.personalusageanalytics.analytics.model.LatestSession;
@@ -87,6 +88,25 @@ public class AnalyticsRepository {
             SELECT MIN(bucket_start) AS earliest_bucket_start
             FROM app_usage_rollups
             WHERE device_id = ?
+            """;
+    private static final String FIND_EARLIEST_BUCKET_START_FOR_DEVICE_AND_APP = """
+            SELECT MIN(bucket_start) AS earliest_bucket_start
+            FROM app_usage_rollups
+            WHERE device_id = ?
+            AND app = ?
+            """;
+    private static final String FIND_AVAILABLE_DATES_FOR_DEVICE = """
+            SELECT DISTINCT (bucket_start AT TIME ZONE bucket_timezone)::date AS usage_date
+            FROM app_usage_rollups
+            WHERE device_id = ?
+            ORDER BY usage_date ASC
+            """;
+    private static final String FIND_AVAILABLE_DATES_FOR_DEVICE_AND_APP = """
+            SELECT DISTINCT (bucket_start AT TIME ZONE bucket_timezone)::date AS usage_date
+            FROM app_usage_rollups
+            WHERE device_id = ?
+            AND app = ?
+            ORDER BY usage_date ASC
             """;
     private final JdbcTemplate jdbcTemplate;
 
@@ -177,13 +197,35 @@ public class AnalyticsRepository {
         return jdbcTemplate.queryForList(FIND_APPS_FOR_DEVICE, String.class, deviceId);
     }
 
-    public Optional<Instant> findEarliestBucketStart(String deviceId) {
-        Timestamp earliest = jdbcTemplate.queryForObject(
-                FIND_EARLIEST_BUCKET_START_FOR_DEVICE,
-                Timestamp.class,
-                deviceId
-        );
+    public Optional<Instant> findEarliestBucketStart(String deviceId, String app) {
+        Timestamp earliest = (app == null || app.isBlank())
+                ? jdbcTemplate.queryForObject(
+                        FIND_EARLIEST_BUCKET_START_FOR_DEVICE,
+                        Timestamp.class,
+                        deviceId
+                )
+                : jdbcTemplate.queryForObject(
+                        FIND_EARLIEST_BUCKET_START_FOR_DEVICE_AND_APP,
+                        Timestamp.class,
+                        deviceId,
+                        app
+                );
 
         return Optional.ofNullable(earliest).map(Timestamp::toInstant);
+    }
+
+    public List<LocalDate> findAvailableDates(String deviceId, String app) {
+        return (app == null || app.isBlank())
+                ? jdbcTemplate.query(
+                        FIND_AVAILABLE_DATES_FOR_DEVICE,
+                        (resultSet, rowNumber) -> resultSet.getDate("usage_date").toLocalDate(),
+                        deviceId
+                )
+                : jdbcTemplate.query(
+                        FIND_AVAILABLE_DATES_FOR_DEVICE_AND_APP,
+                        (resultSet, rowNumber) -> resultSet.getDate("usage_date").toLocalDate(),
+                        deviceId,
+                        app
+                );
     }
 }
