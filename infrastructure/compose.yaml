@@ -80,7 +80,7 @@ services:
     ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:9090/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -119,7 +119,7 @@ services:
     ports:
       - "8081:8081"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8081/actuator/health"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:9090/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10

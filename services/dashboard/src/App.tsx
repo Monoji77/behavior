@@ -1,15 +1,19 @@
-import { type FormEvent, type MouseEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Area, AreaChart, CartesianGrid, type TooltipContentProps, XAxis, YAxis } from "recharts";
+import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { type DashboardData, type Filters, type Granularity, type FilterOptions, loadDashboard, loadFilterOptions } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
 import { RefreshButton, type RefreshStatus } from "./RefreshButton";
 
+const pad = (value: number) => String(value).padStart(2, "0");
+const isoDay = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 const range = () => {
   const to = new Date();
   const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
-  const local = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-  return { from: local(from), to: local(to) };
+  return { from: isoDay(from) + "T00:00", to: isoDay(to) + "T23:59" };
 };
+const dayRange = (day: string) => ({ from: day + "T00:00", to: day + "T23:59" });
 const initialRange = range();
 const duration = (milliseconds?: number | null) => {
   if (!milliseconds) return "—";
@@ -47,52 +51,39 @@ const axisLabel = (value: string, granularity: Granularity) => {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: granularity === "MINUTE" ? "numeric" : undefined }).format(date);
 };
 
+const trendConfig: ChartConfig = { usage: { label: "Usage time", color: "var(--accent-bright)" } };
+
+function TrendTooltip({ active, payload, granularity }: Partial<TooltipContentProps<number, string>> & { granularity: Granularity }) {
+  if (!active || !payload?.length) return null;
+  const bucket = payload[0].payload as DashboardData["rollups"][number];
+  return <div className="trend-tooltip"><strong>{duration(bucket.usageMilliseconds)}</strong><span>{axisLabel(bucket.bucketStart, granularity)}</span></div>;
+}
+
 function Trend({ data, granularity }: { data: DashboardData["rollups"]; granularity: Granularity }) {
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const [hover, setHover] = useState<{ index: number; leftPct: number; topPct: number } | null>(null);
   if (!data.length) return <div className="chart-empty">No activity was recorded for this range.</div>;
   const max = Math.max(...data.map(({ usageMilliseconds }) => usageMilliseconds), 1);
-  const width = 700, height = 230, left = 48, right = 16, top = 16, bottom = 40;
-  const x = (index: number) => left + (index / Math.max(data.length - 1, 1)) * (width - left - right);
-  const y = (value: number) => top + (1 - value / max) * (height - top - bottom);
-  const points = data.map((bucket, index) => x(index) + "," + y(bucket.usageMilliseconds)).join(" ");
-  const area = left + "," + (height - bottom) + " " + points + " " + (width - right) + "," + (height - bottom);
-  const labelled = data.filter((_, index) => index === 0 || index === data.length - 1 || index % Math.ceil(data.length / 5) === 0);
-  const yTicks = [0, .25, .5, .75, 1];
-  const onMove = (event: MouseEvent<HTMLDivElement>) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const relX = event.clientX - rect.left;
-    const svgX = (relX / rect.width) * width;
-    let nearest = 0, bestDistance = Infinity;
-    data.forEach((_, index) => {
-      const distance = Math.abs(x(index) - svgX);
-      if (distance < bestDistance) { bestDistance = distance; nearest = index; }
-    });
-    setHover({ index: nearest, leftPct: (relX / rect.width) * 100, topPct: ((event.clientY - rect.top) / rect.height) * 100 });
-  };
-  const hovered = hover ? data[hover.index] : null;
   return <div className="trend-wrap">
-    <div className="trend-canvas" ref={canvasRef} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
-      <svg className="trend" viewBox={[0, 0, width, height].join(" ")} preserveAspectRatio="none" role="img" aria-label="Usage trend, time in minutes">
-        {yTicks.map((ratio) => <line key={ratio} className="gridline" x1={left} x2={width - right} y1={y(max * ratio)} y2={y(max * ratio)} />)}
-        {yTicks.map((ratio) => <text key={ratio} className="axis y-axis" textAnchor="end" x={left - 8} y={y(max * ratio) + 4}>{Math.round((max * ratio) / 60_000)}m</text>)}
-        <polygon className="trend-area" points={area} /><polyline className="trend-line" points={points} />
-        {data.map((bucket, index) => <circle key={bucket.bucketStart} className="trend-point" cx={x(index)} cy={y(bucket.usageMilliseconds)} r="3" />)}
-        {labelled.map((bucket) => { const index = data.indexOf(bucket); return <text key={bucket.bucketStart} className="axis" textAnchor="middle" x={x(index)} y={height - 10}>{axisLabel(bucket.bucketStart, granularity)}</text>; })}
-        {hovered && <line className="trend-hover-line" x1={x(hover!.index)} x2={x(hover!.index)} y1={top} y2={height - bottom} />}
-        {hovered && <circle className="trend-hover-dot" cx={x(hover!.index)} cy={y(hovered.usageMilliseconds)} r="5" />}
-      </svg>
-      <div className={"trend-tooltip" + (hovered ? " trend-tooltip--visible" : "")} style={hover ? { left: hover.leftPct + "%", top: hover.topPct + "%" } : undefined}>
-        {hovered && <><strong>{duration(hovered.usageMilliseconds)}</strong><span>{axisLabel(hovered.bucketStart, granularity)}</span></>}
-      </div>
-    </div>
+    <ChartContainer config={trendConfig} className="aspect-auto h-[260px] w-full">
+      <AreaChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
+        <defs>
+          <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="var(--color-usage)" stopOpacity={0.35} />
+            <stop offset="95%" stopColor="var(--color-usage)" stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="4 5" />
+        <XAxis dataKey="bucketStart" tickLine={false} axisLine={false} tickMargin={10} minTickGap={40} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: string) => axisLabel(value, granularity)} />
+        <YAxis tickLine={false} axisLine={false} width={40} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: number) => Math.round(value / 60_000) + "m"} />
+        <ChartTooltip cursor={{ stroke: "var(--color-usage)", strokeDasharray: "3 3" }} content={<TrendTooltip granularity={granularity} />} />
+        <Area dataKey="usageMilliseconds" type="monotone" fill="url(#trendFill)" stroke="var(--color-usage)" strokeWidth={3} dot={{ r: 3, fill: "var(--panel)", stroke: "var(--color-usage)", strokeWidth: 2 }} activeDot={{ r: 5, fill: "var(--color-usage)", stroke: "var(--panel)", strokeWidth: 2 }} />
+      </AreaChart>
+    </ChartContainer>
     <div className="chart-key"><span><i /> Usage time (minutes)</span><span>Peak: {duration(max)}</span></div>
   </div>;
 }
 
 function App() {
-  const [filters, setFilters] = useState<Filters>({ deviceId: "", app: "", granularity: "HOUR", ...initialRange });
+  const [filters, setFilters] = useState<Filters>({ deviceId: "iphone-16-pro", app: "instagram", granularity: "HOUR", ...initialRange });
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
@@ -100,6 +91,7 @@ function App() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
+  const hasAppliedDefaultDate = useRef(false);
   const total = useMemo(() => data?.rollups.reduce((sum, item) => sum + item.usageMilliseconds, 0) ?? 0, [data]);
   const update = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value }));
 
@@ -108,16 +100,23 @@ function App() {
     let cancelled = false;
     setOptionsLoading(true);
     loadFilterOptions(filters.deviceId, filters.app)
-      .then((options) => { if (!cancelled) setFilterOptions(options); })
+      .then((options) => {
+        if (cancelled) return;
+        setFilterOptions(options);
+        if (!hasAppliedDefaultDate.current && options.availableDates.length) {
+          hasAppliedDefaultDate.current = true;
+          setFilters((current) => ({ ...current, ...dayRange(options.availableDates[options.availableDates.length - 1]) }));
+        }
+      })
       .catch(() => { if (!cancelled) setFilterOptions((current) => filters.deviceId ? { ...current, apps: [] } : current); })
       .finally(() => { if (!cancelled) setOptionsLoading(false); });
     return () => { cancelled = true; };
   }, [filters.deviceId, filters.app]);
   useEffect(() => {
-    if (filters.app && !filterOptions.apps.includes(filters.app)) {
+    if (!optionsLoading && filters.app && !filterOptions.apps.includes(filters.app)) {
       update("app", "");
     }
-  }, [filterOptions.apps, filters.app]);
+  }, [optionsLoading, filterOptions.apps, filters.app]);
   useEffect(() => {
     if (filters.deviceId && filters.app) {
       submit();
@@ -148,7 +147,7 @@ function App() {
       </form></section>
       {error && <p className="error" role="alert">{error}</p>}
       <section id="overview" className="overview-row" aria-label="Usage summary">
-        <article className="panel report report-card"><p className="eyebrow">Current report</p><h2>{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p><div><span>Range</span><strong>{formatDay(filters.from)} – {formatDay(filters.to)}</strong></div></article>
+        <article className="panel report report-card"><div><p className="eyebrow">Current report</p><h2>{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p></div><div><span>Range</span><strong>{formatDay(filters.from)} – {formatDay(filters.to)}</strong></div></article>
         <div className="metrics"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric label="Usage buckets" value={data ? data.rollups.length : "—"} detail={data ? filters.granularity.toLowerCase() + " intervals" : "Awaiting activity"} icon="⌁" tone="sky" /><Metric label="Latest session" value={data ? duration(data.latestSession?.durationMilliseconds) : "—"} detail={data?.latestSession?.status ?? "Awaiting activity"} icon="▣" tone="amber" /><Metric label="Anomalies" value={data ? data.totalAnomalies : "—"} detail={data ? (data.totalAnomalies ? "Needs review" : "All clear") : "No range selected"} icon="△" tone="rose" /></div>
       </section>
       <section id="activity" className="dashboard-grid"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
