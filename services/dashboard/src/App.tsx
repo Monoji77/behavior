@@ -8,8 +8,14 @@ import { RefreshButton, type RefreshStatus } from "./RefreshButton";
 
 const pad = (value: number) => String(value).padStart(2, "0");
 const isoDay = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+const shiftDay = (day: string, deltaDays: number) => {
+  const date = new Date(day + "T00:00:00");
+  date.setDate(date.getDate() + deltaDays);
+  return isoDay(date);
+};
 const dayRange = (day: string) => ({ from: day + "T00:00", to: day + "T23:59" });
-const range = () => dayRange(isoDay(new Date()));
+const threeDayRange = (endDay: string) => ({ from: shiftDay(endDay, -2) + "T00:00", to: endDay + "T23:59" });
+const range = () => threeDayRange(isoDay(new Date()));
 const initialRange = range();
 const duration = (milliseconds?: number | null) => {
   if (!milliseconds) return "—";
@@ -94,12 +100,6 @@ function App() {
   const hasAppliedDefaultDate = useRef(false);
   const total = useMemo(() => data?.rollups.reduce((sum, item) => sum + item.usageMilliseconds, 0) ?? 0, [data]);
   const update = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value }));
-  const setGranularity = (value: Granularity) => setFilters((current) => {
-    if (value !== "DAY" && dayFromDateTime(current.from) !== dayFromDateTime(current.to)) {
-      return { ...current, granularity: value, ...dayRange(dayFromDateTime(current.to)) };
-    }
-    return { ...current, granularity: value };
-  });
 
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("behavior-theme", theme); }, [theme]);
   useEffect(() => {
@@ -111,7 +111,7 @@ function App() {
         setFilterOptions(options);
         if (!hasAppliedDefaultDate.current && options.availableDates.length) {
           hasAppliedDefaultDate.current = true;
-          setFilters((current) => ({ ...current, ...dayRange(options.availableDates[options.availableDates.length - 1]) }));
+          setFilters((current) => ({ ...current, ...threeDayRange(options.availableDates[options.availableDates.length - 1]) }));
         }
       })
       .catch(() => { if (!cancelled) setFilterOptions((current) => filters.deviceId ? { ...current, apps: [] } : current); })
@@ -156,7 +156,7 @@ function App() {
         <article className="panel report report-card"><div><p className="eyebrow">Current report</p><h2>{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p></div><div><span>Range</span><strong>{dayFromDateTime(filters.from) === dayFromDateTime(filters.to) ? formatDay(filters.from) : formatDay(filters.from) + " – " + formatDay(filters.to)}</strong></div></article>
         <div className="metrics"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric label="Usage buckets" value={data ? data.rollups.length : "—"} detail={data ? filters.granularity.toLowerCase() + " intervals" : "Awaiting activity"} icon="⌁" tone="sky" /><Metric label="Latest session" value={data ? duration(data.latestSession?.durationMilliseconds) : "—"} detail={data?.latestSession?.status ?? "Awaiting activity"} icon="▣" tone="amber" /><Metric label="Anomalies" value={data ? data.totalAnomalies : "—"} detail={data ? (data.totalAnomalies ? "Needs review" : "All clear") : "No range selected"} icon="△" tone="rose" /></div>
       </section>
-      <section id="activity" className="dashboard-grid"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} singleDay={filters.granularity !== "DAY"} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={setGranularity} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
+      <section id="activity" className="dashboard-grid"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
         <article id="session" className="panel session"><header><div><p className="eyebrow">Most recent</p><h2>Latest session</h2></div><span className="session-icon">◷</span></header>{data?.latestSession ? <><strong className="session-time">{duration(data.latestSession.durationMilliseconds)}</strong><span className="session-state">{data.latestSession.status}</span><dl><div><dt>Opened</dt><dd>{time(data.latestSession.openedAt)}</dd></div><div><dt>Closed</dt><dd>{time(data.latestSession.closedAt)}</dd></div><div><dt>Source</dt><dd>{data.latestSession.source}</dd></div></dl></> : <Empty title="No session loaded" text="Choose a device and app to see its latest completed session." />}</article></section>
       <section id="anomalies" className="lower"><article className="panel anomalies"><header><div><p className="eyebrow">Data quality</p><h2>Processing anomalies</h2></div><span className={data?.totalAnomalies ? "pill risk" : "pill clear"}>{data?.totalAnomalies ? "Review" : "Clear"}</span></header>{data?.anomalies.length ? <ul>{data.anomalies.map((item) => <li key={item.anomalyType}><span>{item.anomalyType}</span><strong>{item.count}</strong></li>)}</ul> : <Empty title={data ? "No anomalies found" : "No report loaded"} text={data ? "This range processed without flagged events." : "An anomaly summary will appear with your report."} />}</article></section>
     </main></div>;

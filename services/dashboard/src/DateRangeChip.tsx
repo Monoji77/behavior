@@ -2,7 +2,6 @@ import { getLocalTimeZone, parseDate, today, type CalendarDate, type DateValue }
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
-  Calendar,
   CalendarCell,
   CalendarGrid,
   CalendarGridBody,
@@ -60,13 +59,12 @@ function RangeCell({ date, maxValue }: { date: CalendarDate; maxValue: CalendarD
 interface DateRangeChipProps {
   from: string;
   to: string;
-  singleDay: boolean;
   earliestUsageAt: string | null;
   availableDates: string[];
   onChange: (from: string, to: string) => void;
 }
 
-export function DateRangeChip({ from, to, singleDay, earliestUsageAt, availableDates, onChange }: DateRangeChipProps) {
+export function DateRangeChip({ from, to, earliestUsageAt, availableDates, onChange }: DateRangeChipProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const maxValue = today(getLocalTimeZone()).add({ days: 7 });
@@ -74,14 +72,6 @@ export function DateRangeChip({ from, to, singleDay, earliestUsageAt, availableD
   const value = { start: parseDate(dayFromDateTime(from)), end: parseDate(dayFromDateTime(to)) };
   const availableDaySet = new Set(availableDates);
   const isDateUnavailable = (date: DateValue) => availableDaySet.size > 0 && !availableDaySet.has(date.toString());
-  const gridBody = <>
-    <CalendarGridHeader>
-      {(day) => <CalendarHeaderCell className="range-grid__weekday">{day}</CalendarHeaderCell>}
-    </CalendarGridHeader>
-    <CalendarGridBody>
-      {(date) => <RangeCell date={date} maxValue={maxValue} />}
-    </CalendarGridBody>
-  </>;
 
   useEffect(() => {
     if (!open) return;
@@ -96,62 +86,41 @@ export function DateRangeChip({ from, to, singleDay, earliestUsageAt, availableD
     <div className="date-range-chip-wrap" ref={rootRef}>
       <button type="button" className="date-range-chip" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
         <span className="date-range-chip__label">{formatDay(from)}</span>
-        {!singleDay && <>
-          <span className="date-range-chip__dash">–</span>
-          <span className="date-range-chip__label">{formatDay(to)}</span>
-        </>}
+        <span className="date-range-chip__dash">–</span>
+        <span className="date-range-chip__label">{formatDay(to)}</span>
       </button>
       {open && (
-        <div className="range-popover" role="dialog" aria-label={singleDay ? "Choose a date" : "Choose a date range"}>
-          {singleDay ? (
-            <Calendar
-              aria-label="Usage rollup date"
-              value={value.start}
-              minValue={minValue}
-              maxValue={maxValue}
-              isDateUnavailable={isDateUnavailable}
-              onChange={(date) => {
-                if (!date) return;
-                onChange(dateTimeWithDay(date as CalendarDate, false), dateTimeWithDay(date as CalendarDate, true));
-                setOpen(false);
-              }}
-            >
-              <header className="range-popover__header">
-                <Button slot="previous" aria-label="Previous month" className="range-popover__nav">‹</Button>
-                <Heading className="range-popover__heading" />
-                <Button slot="next" aria-label="Next month" className="range-popover__nav">›</Button>
-              </header>
-              <CalendarGrid className="range-grid" weekdayStyle="short">{gridBody}</CalendarGrid>
-              <footer className="range-popover__footer">
-                <span className="range-popover__legend"><i className="range-popover__dot range-popover__dot--today" /> Today</span>
-                <span className="range-popover__legend"><i className="range-popover__dot range-popover__dot--predictive" /> Predicted (up to +7d)</span>
-              </footer>
-            </Calendar>
-          ) : (
-            <RangeCalendar
-              aria-label="Usage rollup date range"
-              value={value}
-              minValue={minValue}
-              maxValue={maxValue}
-              isDateUnavailable={isDateUnavailable}
-              onChange={(range) => {
-                if (!range) return;
-                onChange(dateTimeWithDay(range.start as CalendarDate, false), dateTimeWithDay(range.end as CalendarDate, true));
-                setOpen(false);
-              }}
-            >
-              <header className="range-popover__header">
-                <Button slot="previous" aria-label="Previous month" className="range-popover__nav">‹</Button>
-                <Heading className="range-popover__heading" />
-                <Button slot="next" aria-label="Next month" className="range-popover__nav">›</Button>
-              </header>
-              <CalendarGrid className="range-grid" weekdayStyle="short">{gridBody}</CalendarGrid>
-              <footer className="range-popover__footer">
-                <span className="range-popover__legend"><i className="range-popover__dot range-popover__dot--today" /> Today</span>
-                <span className="range-popover__legend"><i className="range-popover__dot range-popover__dot--predictive" /> Predicted (up to +7d)</span>
-              </footer>
-            </RangeCalendar>
-          )}
+        <div className="range-popover" role="dialog" aria-label="Choose a date range">
+          <RangeCalendar
+            aria-label="Usage rollup date range"
+            value={value}
+            minValue={minValue}
+            maxValue={maxValue}
+            isDateUnavailable={isDateUnavailable}
+            onChange={(range) => {
+              if (!range) return;
+              onChange(dateTimeWithDay(range.start as CalendarDate, false), dateTimeWithDay(range.end as CalendarDate, true));
+              setOpen(false);
+            }}
+          >
+            <header className="range-popover__header">
+              <Button slot="previous" aria-label="Previous month" className="range-popover__nav">‹</Button>
+              <Heading className="range-popover__heading" />
+              <Button slot="next" aria-label="Next month" className="range-popover__nav">›</Button>
+            </header>
+            <CalendarGrid className="range-grid" weekdayStyle="short">
+              <CalendarGridHeader>
+                {(day) => <CalendarHeaderCell className="range-grid__weekday">{day}</CalendarHeaderCell>}
+              </CalendarGridHeader>
+              <CalendarGridBody>
+                {(date) => <RangeCell date={date} maxValue={maxValue} />}
+              </CalendarGridBody>
+            </CalendarGrid>
+            <footer className="range-popover__footer">
+              <span className="range-popover__legend"><i className="range-popover__dot range-popover__dot--today" /> Today</span>
+              <span className="range-popover__legend"><i className="range-popover__dot range-popover__dot--predictive" /> Predicted (up to +7d)</span>
+            </footer>
+          </RangeCalendar>
         </div>
       )}
     </div>
