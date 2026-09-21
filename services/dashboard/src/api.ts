@@ -41,6 +41,7 @@ export interface DashboardData {
 export interface FilterOptions {
   deviceIds: string[];
   apps: string[];
+  earliestUsageAt: string | null;
 }
 
 interface LatestSessionResponse {

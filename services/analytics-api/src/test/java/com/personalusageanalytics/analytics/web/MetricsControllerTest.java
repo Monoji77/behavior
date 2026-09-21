@@ -1,5 +1,6 @@
 package com.personalusageanalytics.analytics.web;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -179,6 +180,8 @@ class MetricsControllerTest {
                                 .thenReturn(List.of("iphone-12", "pixel-9"));
                 when(analyticsRepository.findApps("iphone-12"))
                                 .thenReturn(List.of("instagram", "maps"));
+                when(analyticsRepository.findEarliestBucketStart("iphone-12"))
+                                .thenReturn(Optional.of(Instant.parse("2026-08-01T00:00:00Z")));
 
                 mockMvc.perform(get("/api/v1/metrics/filter-options")
                                 .param("deviceId", "iphone-12"))
@@ -186,6 +189,19 @@ class MetricsControllerTest {
                                 .andExpect(jsonPath("$.deviceIds[0]").value("iphone-12"))
                                 .andExpect(jsonPath("$.deviceIds[1]").value("pixel-9"))
                                 .andExpect(jsonPath("$.apps[0]").value("instagram"))
-                                .andExpect(jsonPath("$.apps[1]").value("maps"));
+                                .andExpect(jsonPath("$.apps[1]").value("maps"))
+                                .andExpect(jsonPath("$.earliestUsageAt").value("2026-08-01T00:00:00Z"));
+        }
+
+        @Test
+        void omitsEarliestUsageWhenNoDeviceIsSelected() throws Exception {
+                when(analyticsRepository.findDeviceIds())
+                                .thenReturn(List.of("iphone-12", "pixel-9"));
+                when(analyticsRepository.findApps(null))
+                                .thenReturn(List.of("instagram", "maps"));
+
+                mockMvc.perform(get("/api/v1/metrics/filter-options"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.earliestUsageAt").value(nullValue()));
         }
 }
