@@ -48,7 +48,7 @@ function Combobox({ label, value, onChange, options, placeholder, loading }: { l
 const axisLabel = (value: string, granularity: Granularity) => {
   const date = new Date(value);
   if (granularity === "DAY") return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: granularity === "MINUTE" ? "numeric" : undefined }).format(date);
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric" }).format(date);
 };
 
 const trendConfig: ChartConfig = { usage: { label: "Usage time", color: "var(--accent-bright)" } };

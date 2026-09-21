@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import type { Granularity } from "./api";
 
 const OPTIONS: { value: Granularity; label: string }[] = [
-  { value: "MINUTE", label: "minute view" },
   { value: "HOUR", label: "hour view" },
   { value: "DAY", label: "day view" },
 ];
