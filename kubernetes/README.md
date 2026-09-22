@@ -33,6 +33,10 @@ kubectl apply -f .\kubernetes\behavior-secrets.local.yaml
 kubectl apply -f .\kubernetes\kafka-sasl.local.yaml
 kubectl apply -f .\kubernetes\kafka-jaas.local.yaml
 
+# Homelab-only, requires the Tailscale operator (see argocd/tailscale-operator-app.yaml)
+kubectl apply -f .\kubernetes\tailscale-db-service.yaml
+kubectl apply -f .\kubernetes\tailscale-dashboard-ingress.yaml
+
 kubectl apply -f .\kubernetes\timescaledb.yaml
 kubectl apply -f .\kubernetes\kafka-svc.yaml
 kubectl apply -f .\kubernetes\kafka-bootstrap-service.yaml
