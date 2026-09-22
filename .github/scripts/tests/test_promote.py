@@ -24,15 +24,17 @@ class PromotionTest(unittest.TestCase):
         self.command(self.author, "config", "user.email", "test@example.com")
         self.command(self.author, "config", "user.name", "Test")
         self.command(self.author, "checkout", "-b", "main")
-        overlay = self.author / "gitops/behavior/kustomization.yaml"
-        overlay.parent.mkdir(parents=True)
-        overlay.write_text("images:\n" + "".join(
-            f'  - name: ghcr.io/monoji77/behavior-{s}\n    newTag: "initial"\n'
-            for s in ("ingestion-api", "stream-processor", "analytics-api", "dashboard")))
+        for path in ("gitops/behavior/kustomization.yaml", "gitops/behavior-staging/kustomization.yaml"):
+            overlay = self.author / path
+            overlay.parent.mkdir(parents=True, exist_ok=True)
+            overlay.write_text("images:\n" + "".join(
+                f'  - name: ghcr.io/monoji77/behavior-{s}\n    newTag: "initial"\n'
+                for s in ("ingestion-api", "stream-processor", "analytics-api", "dashboard")))
         self.command(self.author, "add", ".")
         self.command(self.author, "commit", "-m", "Initial")
         self.initial = self.command(self.author, "rev-parse", "HEAD")
-        self.command(self.author, "push", "origin", "main", "HEAD:refs/heads/deploy/homelab")
+        self.command(self.author, "push", "origin", "main",
+                     "HEAD:refs/heads/deploy/homelab", "HEAD:refs/heads/deploy/staging")
         self.source = self.advance_main()
         subprocess.run(["git", "clone", "--branch", "main", str(self.remote), str(self.runner)], check=True, capture_output=True)
         self.previous_cwd = Path.cwd()
@@ -50,11 +52,11 @@ class PromotionTest(unittest.TestCase):
         self.command(self.author, "push", "origin", "main")
         return self.command(self.author, "rev-parse", "HEAD")
 
-    def deployment(self):
-        return self.command(self.remote, "rev-parse", "deploy/homelab")
+    def deployment(self, branch="deploy/homelab"):
+        return self.command(self.remote, "rev-parse", branch)
 
     def test_promotes_exact_source_and_is_idempotent(self):
-        promotion.promote(self.source)
+        promotion.promote(self.source, "homelab")
         deployed = self.deployment()
         self.assertNotEqual(deployed, self.initial)
         self.assertEqual(self.command(self.remote, "rev-parse", deployed + "^"), self.initial)
@@ -62,25 +64,38 @@ class PromotionTest(unittest.TestCase):
         self.assertEqual(overlay.count(self.source), 4)
         self.assertEqual(self.command(self.remote, "show", "deploy/homelab:source.txt"), "change")
         self.assertEqual(self.command(self.remote, "rev-parse", "main"), self.source)
-        promotion.promote(self.source)
+        promotion.promote(self.source, "homelab")
         self.assertEqual(self.deployment(), deployed)
+
+    def test_promotes_to_staging_environment_independently_of_homelab(self):
+        promotion.promote(self.source, "staging")
+        staged = self.deployment("deploy/staging")
+        self.assertNotEqual(staged, self.initial)
+        overlay = self.command(self.remote, "show", "deploy/staging:gitops/behavior-staging/kustomization.yaml")
+        self.assertEqual(overlay.count(self.source), 4)
+        # A staging promotion must never touch the production branch.
+        self.assertEqual(self.deployment(), self.initial)
+
+    def test_rejects_unknown_environment(self):
+        with self.assertRaises(ValueError):
+            promotion.promote(self.source, "production")
 
     def test_skips_already_superseded_build(self):
         self.advance_main()
-        promotion.promote(self.source)
+        promotion.promote(self.source, "homelab")
         self.assertEqual(self.deployment(), self.initial)
 
     def test_skips_new_source_arriving_during_preparation(self):
         original = promotion.refresh
         calls = 0
-        def refresh():
+        def refresh(deploy_branch):
             nonlocal calls
             calls += 1
             if calls == 2:
                 self.advance_main()
-            original()
+            original(deploy_branch)
         with patch.object(promotion, "refresh", refresh):
-            promotion.promote(self.source)
+            promotion.promote(self.source, "homelab")
         self.assertEqual(self.deployment(), self.initial)
 
     def conflict(self, newer_source=False):
@@ -98,7 +113,7 @@ class PromotionTest(unittest.TestCase):
                     self.advance_main()
             return original(*args, **kwargs)
         with patch.object(promotion, "git", git):
-            promotion.promote(self.source)
+            promotion.promote(self.source, "homelab")
         return competing
 
     def test_retries_non_fast_forward_on_latest_deployment_parent(self):
@@ -115,13 +130,13 @@ class PromotionTest(unittest.TestCase):
             f'    - newTag: initial\n      name: ghcr.io/monoji77/behavior-{s}\n'
             for s in ("ingestion-api", "stream-processor", "analytics-api", "dashboard")))
         source = self.advance_main()
-        promotion.promote(source)
+        promotion.promote(source, "homelab")
         result = self.command(self.remote, "show", "deploy/homelab:gitops/behavior/kustomization.yaml")
         self.assertEqual(result.count(source), 4)
 
     def test_rejects_invalid_sha(self):
         with self.assertRaises(ValueError):
-            promotion.promote("main")
+            promotion.promote("main", "homelab")
 
 if __name__ == "__main__":
     unittest.main()

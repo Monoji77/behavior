@@ -40,6 +40,10 @@ kubectl apply -f .\kubernetes\kafka-stateful-set.yaml
 
 kubectl rollout status statefulset/timescaledb -n behavior --timeout=180s
 kubectl rollout status statefulset/kafka -n kafka --timeout=300s
+
+# Homelab-only, one-time: registers the staging environment with Argo CD.
+# See docs/ci-cd.md for the two-stage (staging/production) promotion model.
+kubectl apply -f .\argocd\behavior-staging-app.yaml
 ```
 
 ## 3. Create Kafka topics

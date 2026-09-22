@@ -61,11 +61,13 @@ jobs:
         with:
           version: v1.36.4
       - name: Render deployment manifests
-        run: kubectl kustomize gitops/behavior > behavior-rendered.yaml
+        run: |
+          kubectl kustomize gitops/behavior > behavior-rendered.yaml
+          kubectl kustomize gitops/behavior-staging > behavior-staging-rendered.yaml
       - name: Validate Kubernetes schemas
         uses: docker://ghcr.io/yannh/kubeconform:v0.7.0
         with:
-          args: -strict -summary -kubernetes-version 1.36.0 behavior-rendered.yaml
+          args: -strict -summary -kubernetes-version 1.36.0 behavior-rendered.yaml behavior-staging-rendered.yaml
       - name: Install promotion parser
         run: python3 -m pip install PyYAML==6.0.2
       - name: Test promotion freshness and conflicts
@@ -130,7 +132,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
 
   promote:
-    name: Promote published images
+    name: Promote published images to staging
     needs: [test, dashboard-test, validate, publish]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -143,4 +145,4 @@ jobs:
       - name: Promote only the current main commit
         env:
           SOURCE_SHA: ${{ github.sha }}
-        run: python3 .github/scripts/promote.py "$SOURCE_SHA"
+        run: python3 .github/scripts/promote.py "$SOURCE_SHA" staging

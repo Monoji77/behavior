@@ -1,0 +1,93 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: behavior-staging
+resources:
+  - ../../kubernetes
+# Staging previews dashboard + analytics-api only. ingestion-api and
+# stream-processor own Kafka consumer groups / writes and must never be
+# duplicated -- a second copy would risk corrupting production data.
+# The close-events migration Job is a one-time schema fix already applied
+# to production; staging has no database of its own to run it against.
+# This cluster does not have the Prometheus Operator ServiceMonitor CRD.
+patches:
+  - patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: ingestion-api
+        namespace: behavior
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: ingestion-api
+        namespace: behavior
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: ingestion-api-metrics
+        namespace: behavior
+  - patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: stream-processor
+        namespace: behavior
+  - patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: timescaledb-close-events-migration
+        namespace: behavior
+  - patch: |-
+      $patch: delete
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: ingestion-api
+        namespace: behavior
+  - patch: |-
+      $patch: delete
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: analytics-api
+        namespace: behavior
+  # analytics-api has no database of its own here -- read production's
+  # TimescaleDB cross-namespace instead (read-only, verified safe).
+  - target:
+      kind: Deployment
+      name: analytics-api
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: timescaledb.behavior.svc.cluster.local
+  # k3s's Klipper LoadBalancer binds the Service port directly on the
+  # node's interfaces -- 8082 is already claimed by production's dashboard
+  # Service on the same node, so staging needs a different port.
+  - target:
+      kind: Service
+      name: dashboard
+    patch: |-
+      - op: replace
+        path: /spec/ports/0/port
+        value: 8092
+# Promote a release by updating all four tags to the same published commit
+# SHA -- kept as 4 entries (matching production) even though ingestion-api
+# and stream-processor are deleted above, so promote.py's per-service
+# exact-match contract keeps working unmodified across both environments.
+images:
+  - name: ghcr.io/monoji77/behavior-ingestion-api
+    newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
+  - name: ghcr.io/monoji77/behavior-stream-processor
+    newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
+  - name: ghcr.io/monoji77/behavior-analytics-api
+    newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
+  - name: ghcr.io/monoji77/behavior-dashboard
+    newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
