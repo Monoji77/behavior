@@ -170,7 +170,7 @@ function App() {
   }
 
   return <TooltipProvider delay={150}><div className="shell">
-    <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>Usage overview</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button><b>CY</b></div></header>
+    <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>Usage overview</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
       <section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <FilterMenu loading={optionsLoading} fields={[
           { item: "Device", value: filters.deviceId, placeholder: "Choose a device", tooltip: "Select a device", options: filterOptions.deviceIds, onChange: (value) => update("deviceId", value) },
