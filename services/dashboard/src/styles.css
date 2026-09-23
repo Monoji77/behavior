@@ -85,7 +85,9 @@
 
 /* Current report card, sits left of the metrics tiles, vertically centered */
 .report-card{flex-shrink:0;max-width:22rem;width:22rem}
-.trend-title{align-items:center;display:flex;gap:.5rem}
+.trend-title{align-items:center;display:flex;min-height:1.875rem}
+.trend-panel>header{gap:1rem}
+.trend-panel .rollup-controls{gap:.7rem}
 
 /* Mobile-only glass navigation: compact at rest, with the Home label on demand. */
 .glass-nav{display:none}
