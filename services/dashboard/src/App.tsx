@@ -102,6 +102,12 @@ function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("behavior-theme", theme); }, [theme]);
   useEffect(() => {
+    if (!navigationExpanded) return;
+    const collapseNavigation = () => setNavigationExpanded(false);
+    window.addEventListener("scroll", collapseNavigation, { passive: true });
+    return () => window.removeEventListener("scroll", collapseNavigation);
+  }, [navigationExpanded]);
+  useEffect(() => {
     let cancelled = false;
     const selectionKey = filters.deviceId + "|" + filters.app;
     setRangeKey("");
@@ -180,14 +186,13 @@ function App() {
         <RefreshButton status={refreshStatus} />
       </form></section>
       {error && <p className="error" role="alert">{error}</p>}
-      <section id="overview" className="overview-row" aria-label="Usage summary">
+      <section id="overview" className="dashboard-layout" aria-label="Usage summary">
         <article className="panel report report-card"><div className="report-head"><p className="eyebrow">Current report</p><h2>{filters.app && <AppIcon app={filters.app} url={filterOptions.appIcons[filters.app]} size={30} />}{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p></div>
           {rank && <div className={"rank rank-" + (rank.position + 1)} aria-label={`${rank.entry.app} is this week's ${RANKS[rank.position].toLowerCase()}`}><span className="rank-badge">{rank.position + 1}</span><span className="rank-text"><small>{RANKS[rank.position]}</small><strong><AppIcon app={rank.entry.app} url={rank.entry.iconUrl} size={18} />{rank.entry.app}</strong></span><em>{duration(rank.entry.usageMilliseconds)}</em></div>}
           <div className="report-range"><span>Range</span><strong>{rangeLabel}</strong></div></article>
+        <section id="activity" className="activity"><article className="panel trend-panel"><header><div><h2 className="trend-title">{filters.app ? <><AppIcon app={filters.app} url={filterOptions.appIcons[filters.app]} size={30} /><span className="sr-only">{filters.app}</span></> : "Select an app"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend rollups={data.rollups} from={filters.from} to={filters.to} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article></section>
         <div className="metrics"><Metric label="Total Time Tracked" value={data ? duration(total) : "—"} detail={data ? rangeLabel : "Load a report to begin"} icon="◷"><div className="metric-secondary"><p>Time Tracked [ past week ]</p><strong>{data ? duration(data.pastWeekMilliseconds) : "—"}</strong></div></Metric><Metric id="session" label="Longest Session [ past week ]" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
       </section>
-      <section id="activity" className="activity"><article className="panel trend-panel"><header><div><h2 className="trend-title">{filters.app || "Select an app"}{filters.app && <AppIcon app={filters.app} url={filterOptions.appIcons[filters.app]} size={26} />}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend rollups={data.rollups} from={filters.from} to={filters.to} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
-</section>
 
     </main>
     <nav className="glass-nav" aria-label="Primary navigation">

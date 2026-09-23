@@ -85,7 +85,13 @@
 
 /* Current report card, sits left of the metrics tiles, vertically centered */
 .report-card{flex-shrink:0;max-width:22rem;width:22rem}
-.trend-title{align-items:center;display:flex;gap:.5rem}
+.trend-title{align-items:center;display:flex;min-height:1.875rem}
+.trend-panel>header{gap:1rem}
+.trend-panel .rollup-controls{gap:.7rem}
+.dashboard-layout{display:grid;gap:1rem 1.5rem;grid-template-areas:"report metrics" "activity activity";grid-template-columns:22rem minmax(0,1fr)}
+.dashboard-layout .report-card{grid-area:report}
+.dashboard-layout .metrics{grid-area:metrics}
+.dashboard-layout .activity{grid-area:activity}
 
 /* Mobile-only glass navigation: compact at rest, with the Home label on demand. */
 .glass-nav{display:none}
@@ -104,6 +110,11 @@
   .glass-nav__icon svg{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8;height:1.08rem;width:1.08rem}
   .glass-nav__label{color:var(--text);font-size:.78rem;font-weight:750;letter-spacing:.01em;max-width:0;opacity:0;overflow:hidden;transform:translateX(-.45rem);transition:max-width .25s ease .04s,opacity .18s ease,transform .28s ease;white-space:nowrap}
   .glass-nav__home.is-expanded .glass-nav__label{max-width:3.25rem;opacity:1;transform:translateX(0)}
+}
+
+@media(max-width:820px){
+  .dashboard-layout{grid-template-areas:"report" "activity" "metrics";grid-template-columns:minmax(0,1fr)}
+  .dashboard-layout .report-card{max-width:none;width:auto}
 }
 
 @media(prefers-reduced-motion:reduce){
