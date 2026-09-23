@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, CartesianGrid, type TooltipContentProps, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
-import { type DashboardData, type Filters, type Granularity, type FilterOptions, loadDashboard, loadFilterOptions } from "./api";
+import { type DashboardData, type Filters, type Granularity, type FilterOptions, defaultSelection, loadDashboard, loadFilterOptions } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
 import { RefreshButton, type RefreshStatus } from "./RefreshButton";
@@ -89,15 +89,16 @@ function Trend({ data, granularity }: { data: DashboardData["rollups"]; granular
 }
 
 function App() {
-  const [filters, setFilters] = useState<Filters>({ deviceId: "iphone-16-pro", app: "instagram", granularity: "HOUR", ...initialRange });
+  const [filters, setFilters] = useState<Filters>({ deviceId: "", app: "", granularity: "HOUR", ...initialRange });
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [] });
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [], topApp: null });
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
   const hasAppliedDefaultDate = useRef(false);
+  const hasAppliedDefaultSelection = useRef(false);
   const total = useMemo(() => data?.rollups.reduce((sum, item) => sum + item.usageMilliseconds, 0) ?? 0, [data]);
   const update = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value }));
 
@@ -109,6 +110,11 @@ function App() {
       .then((options) => {
         if (cancelled) return;
         setFilterOptions(options);
+        if (!hasAppliedDefaultSelection.current) {
+          const { done, ...selection } = defaultSelection(filters.deviceId, filters.app, options);
+          hasAppliedDefaultSelection.current = done;
+          if (selection.deviceId || selection.app) setFilters((current) => ({ ...current, ...selection }));
+        }
         if (!hasAppliedDefaultDate.current && options.availableDates.length) {
           hasAppliedDefaultDate.current = true;
           setFilters((current) => ({ ...current, ...threeDayRange(options.availableDates[options.availableDates.length - 1]) }));

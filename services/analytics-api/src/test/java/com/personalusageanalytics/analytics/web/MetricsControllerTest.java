@@ -183,6 +183,8 @@ class MetricsControllerTest {
                                 .thenReturn(List.of("instagram", "maps"));
                 when(analyticsRepository.findEarliestBucketStart("iphone-12", null))
                                 .thenReturn(Optional.of(Instant.parse("2026-08-01T00:00:00Z")));
+                when(analyticsRepository.findTopAppOnLatestDay("iphone-12"))
+                                .thenReturn(Optional.of("maps"));
 
                 mockMvc.perform(get("/api/v1/metrics/filter-options")
                                 .param("deviceId", "iphone-12"))
@@ -191,7 +193,8 @@ class MetricsControllerTest {
                                 .andExpect(jsonPath("$.deviceIds[1]").value("pixel-9"))
                                 .andExpect(jsonPath("$.apps[0]").value("instagram"))
                                 .andExpect(jsonPath("$.apps[1]").value("maps"))
-                                .andExpect(jsonPath("$.earliestUsageAt").value("2026-08-01T00:00:00Z"));
+                                .andExpect(jsonPath("$.earliestUsageAt").value("2026-08-01T00:00:00Z"))
+                                .andExpect(jsonPath("$.topApp").value("maps"));
         }
 
         @Test
@@ -242,6 +245,7 @@ class MetricsControllerTest {
                 mockMvc.perform(get("/api/v1/metrics/filter-options"))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.earliestUsageAt").value(nullValue()))
-                                .andExpect(jsonPath("$.availableDates.length()").value(0));
+                                .andExpect(jsonPath("$.availableDates.length()").value(0))
+                                .andExpect(jsonPath("$.topApp").value(nullValue()));
         }
 }

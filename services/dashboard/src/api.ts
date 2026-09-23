@@ -43,6 +43,19 @@ export interface FilterOptions {
   apps: string[];
   earliestUsageAt: string | null;
   availableDates: string[];
+  topApp: string | null;
+}
+
+export type DefaultSelection = { deviceId?: string; app?: string; done: boolean };
+
+// On first load: pick a device, then that device's most-used app today.
+// Never replaces something already chosen.
+export function defaultSelection(deviceId: string, app: string, options: FilterOptions): DefaultSelection {
+  if (!deviceId) {
+    const device = options.deviceIds[0];
+    return device ? { deviceId: device, done: false } : { done: true };
+  }
+  return !app && options.topApp ? { app: options.topApp, done: true } : { done: true };
 }
 
 interface LatestSessionResponse {

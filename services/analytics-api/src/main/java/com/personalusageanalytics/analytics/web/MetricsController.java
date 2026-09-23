@@ -72,11 +72,16 @@ public class MetricsController {
                 ? List.of()
                 : analyticsRepository.findAvailableDates(deviceId, app);
 
+        String topApp = (deviceId == null || deviceId.isBlank())
+                ? null
+                : analyticsRepository.findTopAppOnLatestDay(deviceId).orElse(null);
+
         return new FilterOptionsResponse(
                 analyticsRepository.findDeviceIds(),
                 analyticsRepository.findApps(deviceId),
                 earliestUsageAt,
-                availableDates
+                availableDates,
+                topApp
         );
     }
 
@@ -201,7 +206,10 @@ public class MetricsController {
             List<String> deviceIds,
             List<String> apps,
             Instant earliestUsageAt,
-            List<LocalDate> availableDates
+            List<LocalDate> availableDates,
+            // App with the most usage today (or on the most recent day with
+            // usage) for the selected device; the dashboard's default app.
+            String topApp
     ) {
     }
 }

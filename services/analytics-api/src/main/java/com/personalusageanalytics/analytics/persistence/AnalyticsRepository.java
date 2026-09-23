@@ -108,6 +108,18 @@ public class AnalyticsRepository {
             AND app = ?
             ORDER BY usage_date ASC
             """;
+    // Daily buckets are already cut at local midnight (bucket_timezone), so the
+    // most recent day with usage is today whenever there is any usage today.
+    private static final String FIND_TOP_APP_ON_LATEST_DAY = """
+            SELECT app
+            FROM app_usage_rollups
+            WHERE device_id = ?
+            AND granularity = 'DAY'
+            AND usage_milliseconds > 0
+            GROUP BY app, bucket_start
+            ORDER BY bucket_start DESC, SUM(usage_milliseconds) DESC, app ASC
+            LIMIT 1
+            """;
     private final JdbcTemplate jdbcTemplate;
 
     public AnalyticsRepository(JdbcTemplate jdbcTemplate) {
@@ -195,6 +207,12 @@ public class AnalyticsRepository {
         }
 
         return jdbcTemplate.queryForList(FIND_APPS_FOR_DEVICE, String.class, deviceId);
+    }
+
+    public Optional<String> findTopAppOnLatestDay(String deviceId) {
+        return jdbcTemplate.queryForList(FIND_TOP_APP_ON_LATEST_DAY, String.class, deviceId)
+                .stream()
+                .findFirst();
     }
 
     public Optional<Instant> findEarliestBucketStart(String deviceId, String app) {
