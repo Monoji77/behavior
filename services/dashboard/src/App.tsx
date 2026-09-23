@@ -102,6 +102,12 @@ function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("behavior-theme", theme); }, [theme]);
   useEffect(() => {
+    if (!navigationExpanded) return;
+    const collapseNavigation = () => setNavigationExpanded(false);
+    window.addEventListener("scroll", collapseNavigation, { passive: true });
+    return () => window.removeEventListener("scroll", collapseNavigation);
+  }, [navigationExpanded]);
+  useEffect(() => {
     let cancelled = false;
     const selectionKey = filters.deviceId + "|" + filters.app;
     setRangeKey("");
