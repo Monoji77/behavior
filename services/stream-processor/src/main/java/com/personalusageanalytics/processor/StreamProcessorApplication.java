@@ -23,6 +23,11 @@ public class StreamProcessorApplication {
     }
 
     @Bean
+    String[] rawEventTopics(ProcessorProperties processorProperties) {
+        return processorProperties.topics().rawEvents().toArray(String[]::new);
+    }
+
+    @Bean
     DefaultErrorHandler kafkaErrorHandler(
             KafkaTemplate<Object, Object> kafkaTemplate,
             ProcessorProperties processorProperties

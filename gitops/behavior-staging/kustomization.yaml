@@ -3,15 +3,11 @@ kind: Kustomization
 namespace: behavior-staging
 resources:
 - ../../kubernetes
+- ../../kubernetes/database
+- kafka-topics-job.yaml
+- resource-limits.yaml
+- priority-class.yaml
 patches:
-- patch: "$patch: delete\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name:\
-    \ ingestion-api\n  namespace: behavior"
-- patch: "$patch: delete\napiVersion: v1\nkind: Service\nmetadata:\n  name: ingestion-api\n\
-    \  namespace: behavior"
-- patch: "$patch: delete\napiVersion: v1\nkind: Service\nmetadata:\n  name: ingestion-api-metrics\n\
-    \  namespace: behavior"
-- patch: "$patch: delete\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name:\
-    \ stream-processor\n  namespace: behavior"
 - patch: "$patch: delete\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: timescaledb-close-events-migration\n\
     \  namespace: behavior"
 - patch: "$patch: delete\napiVersion: monitoring.coreos.com/v1\nkind: ServiceMonitor\n\
@@ -19,20 +15,39 @@ patches:
 - patch: "$patch: delete\napiVersion: monitoring.coreos.com/v1\nkind: ServiceMonitor\n\
     metadata:\n  name: analytics-api\n  namespace: behavior"
 - target:
-    kind: Deployment
-    name: analytics-api
-  patch: "- op: replace\n  path: /spec/template/spec/containers/0/env/0/value\n  value:\
-    \ timescaledb.behavior.svc.cluster.local"
+    kind: Service
+    name: ingestion-api
+  patch: "- op: replace\n  path: /spec/ports/0/port\n  value: 18090"
 - target:
     kind: Service
     name: dashboard
   patch: "- op: replace\n  path: /spec/ports/0/port\n  value: 8092"
+- target:
+    kind: Deployment
+    name: ingestion-api
+  patch: "- op: add\n  path: /spec/template/spec/containers/0/env/-\n  value:\n  \
+    \  name: INGESTION_TOPICS_RAWEVENTS\n    value: staging.app-usage-events.raw.v1"
+- target:
+    kind: Deployment
+    name: stream-processor
+  patch: "- op: add\n  path: /spec/template/spec/containers/0/env/-\n  value:\n  \
+    \  name: PROCESSOR_TOPICS_RAWEVENTS\n    value: app-usage-events.raw.v1,staging.app-usage-events.raw.v1\n\
+    - op: add\n  path: /spec/template/spec/containers/0/env/-\n  value:\n    name:\
+    \ PROCESSOR_TOPICS_DEADLETTER\n    value: staging.app-usage-events.dlq.v1\n- op:\
+    \ add\n  path: /spec/template/spec/containers/0/env/-\n  value:\n    name: SPRING_KAFKA_CONSUMER_GROUPID\n\
+    \    value: raw-event-persistence-staging-v1"
+- target:
+    kind: Deployment
+  patch: "- op: add\n  path: /spec/template/spec/priorityClassName\n  value: behavior-staging-low"
+- target:
+    kind: StatefulSet
+  patch: "- op: add\n  path: /spec/template/spec/priorityClassName\n  value: behavior-staging-low"
 images:
 - name: ghcr.io/monoji77/behavior-ingestion-api
-  newTag: 28b369d852d2f40f2b7aad3a137d2585d522d595
+  newTag: d534dd693d3a1b47fac4ebe78148844b476e55b0
 - name: ghcr.io/monoji77/behavior-stream-processor
-  newTag: 28b369d852d2f40f2b7aad3a137d2585d522d595
+  newTag: d534dd693d3a1b47fac4ebe78148844b476e55b0
 - name: ghcr.io/monoji77/behavior-analytics-api
-  newTag: 28b369d852d2f40f2b7aad3a137d2585d522d595
+  newTag: d534dd693d3a1b47fac4ebe78148844b476e55b0
 - name: ghcr.io/monoji77/behavior-dashboard
-  newTag: 28b369d852d2f40f2b7aad3a137d2585d522d595
+  newTag: d534dd693d3a1b47fac4ebe78148844b476e55b0

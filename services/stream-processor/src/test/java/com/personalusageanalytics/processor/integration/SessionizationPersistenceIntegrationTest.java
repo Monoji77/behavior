@@ -84,7 +84,7 @@ class SessionizationPersistenceIntegrationTest {
 
         ProcessorProperties properties = new ProcessorProperties(
                 new ProcessorProperties.Topics(
-                        "app-usage-events.raw.v1",
+                        List.of("app-usage-events.raw.v1"),
                         "app-usage-events.dlq.v1"
                 ),
                 new ProcessorProperties.Sessionization(

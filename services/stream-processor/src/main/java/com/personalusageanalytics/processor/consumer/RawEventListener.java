@@ -16,7 +16,7 @@ public class RawEventListener {
         this.sessionizationService = sessionizationService;
     }
 
-    @KafkaListener(topics = "${processor.topics.raw-events}")
+    @KafkaListener(topics = "#{@rawEventTopics}")
     public void persist(ConsumerRecord<String, RawUsageEvent> record) {
         RawUsageEvent event = record.value();
 
