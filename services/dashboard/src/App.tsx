@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, CartesianGrid, type TooltipContentProps, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
-import { type DashboardData, type Filters, type Granularity, type FilterOptions, loadDashboard, loadFilterOptions } from "./api";
+import { type DashboardData, type Filters, type Granularity, type FilterOptions, defaultSelection, loadDashboard, loadFilterOptions } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
 import { RefreshButton, type RefreshStatus } from "./RefreshButton";
@@ -46,7 +46,7 @@ function Combobox({ label, value, onChange, options, placeholder, loading }: { l
   const cancelClose = () => { if (closeTimer.current !== undefined) { window.clearTimeout(closeTimer.current); closeTimer.current = undefined; } };
   const close = () => { cancelClose(); closeTimer.current = window.setTimeout(() => { setOpen(false); setQuery(value); setFiltering(false); closeTimer.current = undefined; }, 120); };
   const select = (item: string) => { cancelClose(); onChange(item); setQuery(item); setOpen(false); setFiltering(false); };
-  return <label className="filter-pill combo-pill"><span>{label}</span><div className="combo-wrap"><input required role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} value={query} onFocus={() => { cancelClose(); setOpen(true); setFiltering(false); }} onBlur={close} onChange={(event) => { setQuery(event.target.value); setOpen(true); setFiltering(true); }} placeholder={placeholder} /> <Chevron />
+  return <label className="filter-pill combo-pill"><span>{label}</span><div className="combo-wrap"><input required role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} value={query} onFocus={() => { cancelClose(); setOpen(true); setFiltering(false); }} onBlur={close} onChange={(event) => { setQuery(event.target.value); setOpen(true); setFiltering(true); }} onKeyDown={(event) => { if (event.key === "Enter" && filtering && matches.length) { event.preventDefault(); select(matches[0]); } }} placeholder={placeholder} /> <Chevron />
     {open && <ul id={listId} role="listbox" className="option-list">{loading ? <li className="no-match">Loading available {label.toLocaleLowerCase()}s…</li> : matches.length ? matches.map((item) => <li key={item} role="option" aria-selected={item === value} onPointerDown={(event) => event.preventDefault()} onClick={() => select(item)}>{item}</li>) : <li className="no-match">No matching {label.toLocaleLowerCase()} found</li>}</ul>}
   </div></label>;
 }
@@ -89,15 +89,16 @@ function Trend({ data, granularity }: { data: DashboardData["rollups"]; granular
 }
 
 function App() {
-  const [filters, setFilters] = useState<Filters>({ deviceId: "iphone-16-pro", app: "instagram", granularity: "HOUR", ...initialRange });
+  const [filters, setFilters] = useState<Filters>({ deviceId: "", app: "", granularity: "HOUR", ...initialRange });
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [] });
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [], topApp: null });
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
   const hasAppliedDefaultDate = useRef(false);
+  const hasAppliedDefaultSelection = useRef(false);
   const total = useMemo(() => data?.rollups.reduce((sum, item) => sum + item.usageMilliseconds, 0) ?? 0, [data]);
   const update = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value }));
 
@@ -109,6 +110,11 @@ function App() {
       .then((options) => {
         if (cancelled) return;
         setFilterOptions(options);
+        if (!hasAppliedDefaultSelection.current) {
+          const { done, ...selection } = defaultSelection(filters.deviceId, filters.app, options);
+          hasAppliedDefaultSelection.current = done;
+          if (selection.deviceId || selection.app) setFilters((current) => ({ ...current, ...selection }));
+        }
         if (!hasAppliedDefaultDate.current && options.availableDates.length) {
           hasAppliedDefaultDate.current = true;
           setFilters((current) => ({ ...current, ...threeDayRange(options.availableDates[options.availableDates.length - 1]) }));
@@ -131,7 +137,10 @@ function App() {
   }, [filters.deviceId, filters.app, filters.from, filters.to, filters.granularity]);
   function toggleTheme() { setSparkle(true); setTheme((current) => current === "dark" ? "light" : "dark"); window.setTimeout(() => setSparkle(false), 520); }
   async function submit(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault(); setRefreshStatus("loading"); setError(null);
+    event?.preventDefault();
+    // The inputs' `required` only sees typed text, not a chosen option; never query with nothing selected.
+    if (!filters.deviceId || !filters.app) { setData(null); setError("Choose a device and an app from the list."); return; }
+    setRefreshStatus("loading"); setError(null);
     try {
       setData(await loadDashboard(filters));
       setRefreshStatus("done");
@@ -144,9 +153,9 @@ function App() {
   }
 
   return <div className="shell">
-    <aside className="sidebar"><a className="brand" href="#top"><b>U</b> Usage<span>OS</span></a><nav aria-label="Dashboard navigation"><a className="selected" href="#overview">▦ Overview</a><a href="#activity">⌁ Activity</a><a href="#session">◷ Sessions</a><a href="#anomalies">△ Anomalies</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
+    <aside className="sidebar"><a className="brand" href="#top"><b>U</b> Usage<span>OS</span></a><nav aria-label="Dashboard navigation"><a className="selected" href="#overview">▦ Overview</a><a href="#activity">⌁ Activity</a><a href="#session">◷ Sessions</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
     <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>Usage overview</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button><b>CY</b></div></header>
-      <section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns, sessions, and processing anomalies.</p></div><form onSubmit={submit}>
+      <section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <Combobox label="Device" value={filters.deviceId} onChange={(value) => update("deviceId", value)} options={filterOptions.deviceIds} loading={optionsLoading} placeholder="Search available devices" />
         <Combobox label="App" value={filters.app} onChange={(value) => update("app", value)} options={filterOptions.apps} loading={optionsLoading} placeholder="Search available apps" />
         <RefreshButton status={refreshStatus} />
@@ -154,11 +163,11 @@ function App() {
       {error && <p className="error" role="alert">{error}</p>}
       <section id="overview" className="overview-row" aria-label="Usage summary">
         <article className="panel report report-card"><div><p className="eyebrow">Current report</p><h2>{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p></div><div><span>Range</span><strong>{dayFromDateTime(filters.from) === dayFromDateTime(filters.to) ? formatDay(filters.from) : formatDay(filters.from) + " – " + formatDay(filters.to)}</strong></div></article>
-        <div className="metrics"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric label="Usage buckets" value={data ? data.rollups.length : "—"} detail={data ? filters.granularity.toLowerCase() + " intervals" : "Awaiting activity"} icon="⌁" tone="sky" /><Metric label="Latest session" value={data ? duration(data.latestSession?.durationMilliseconds) : "—"} detail={data?.latestSession?.status ?? "Awaiting activity"} icon="▣" tone="amber" /><Metric label="Anomalies" value={data ? data.totalAnomalies : "—"} detail={data ? (data.totalAnomalies ? "Needs review" : "All clear") : "No range selected"} icon="△" tone="rose" /></div>
+        <div className="metrics"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric label="Longest session (past week)" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data ? (data.longestSession ? "Opened " + time(data.longestSession.openedAt) : "No session this week") : "Awaiting activity"} icon="▣" tone="amber" /></div>
       </section>
       <section id="activity" className="dashboard-grid"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
-        <article id="session" className="panel session"><header><div><p className="eyebrow">Most recent</p><h2>Latest session</h2></div><span className="session-icon">◷</span></header>{data?.latestSession ? <><strong className="session-time">{duration(data.latestSession.durationMilliseconds)}</strong><span className="session-state">{data.latestSession.status}</span><dl><div><dt>Opened</dt><dd>{time(data.latestSession.openedAt)}</dd></div><div><dt>Closed</dt><dd>{time(data.latestSession.closedAt)}</dd></div><div><dt>Source</dt><dd>{data.latestSession.source}</dd></div></dl></> : <Empty title="No session loaded" text="Choose a device and app to see its latest completed session." />}</article></section>
-      <section id="anomalies" className="lower"><article className="panel anomalies"><header><div><p className="eyebrow">Data quality</p><h2>Processing anomalies</h2></div><span className={data?.totalAnomalies ? "pill risk" : "pill clear"}>{data?.totalAnomalies ? "Review" : "Clear"}</span></header>{data?.anomalies.length ? <ul>{data.anomalies.map((item) => <li key={item.anomalyType}><span>{item.anomalyType}</span><strong>{item.count}</strong></li>)}</ul> : <Empty title={data ? "No anomalies found" : "No report loaded"} text={data ? "This range processed without flagged events." : "An anomaly summary will appear with your report."} />}</article></section>
+        <article id="session" className="panel session"><header><div><p className="eyebrow">Past week</p><h2>Longest session</h2></div><span className="session-icon">◷</span></header>{data?.longestSession ? <><strong className="session-time">{duration(data.longestSession.durationMilliseconds)}</strong><dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl></> : <Empty title={data ? "No session this week" : "No session loaded"} text={data ? "This app has no completed session in the past 7 days." : "Choose a device and app to see its longest session of the past week."} />}</article></section>
+
     </main></div>;
 }
 function Empty({ title, text }: { title: string; text: string }) { return <div className="empty"><strong>{title}</strong><p>{text}</p></div>; }
