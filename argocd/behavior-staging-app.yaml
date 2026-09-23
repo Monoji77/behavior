@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: behavior-staging
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Monoji77/behavior.git
+    targetRevision: deploy/staging
+    path: gitops/behavior-staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: behavior-staging
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

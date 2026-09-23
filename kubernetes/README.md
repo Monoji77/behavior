@@ -33,6 +33,10 @@ kubectl apply -f .\kubernetes\behavior-secrets.local.yaml
 kubectl apply -f .\kubernetes\kafka-sasl.local.yaml
 kubectl apply -f .\kubernetes\kafka-jaas.local.yaml
 
+# Homelab-only, requires the Tailscale operator (see argocd/tailscale-operator-app.yaml)
+kubectl apply -f .\kubernetes\tailscale-db-service.yaml
+kubectl apply -f .\kubernetes\tailscale-dashboard-ingress.yaml
+
 kubectl apply -f .\kubernetes\timescaledb.yaml
 kubectl apply -f .\kubernetes\kafka-svc.yaml
 kubectl apply -f .\kubernetes\kafka-bootstrap-service.yaml
@@ -40,7 +44,32 @@ kubectl apply -f .\kubernetes\kafka-stateful-set.yaml
 
 kubectl rollout status statefulset/timescaledb -n behavior --timeout=180s
 kubectl rollout status statefulset/kafka -n kafka --timeout=300s
+
+# Homelab-only, one-time: registers the staging environment with Argo CD.
+# See docs/ci-cd.md for the two-stage (staging/production) promotion model.
+kubectl apply -f .\argocd\behavior-staging-app.yaml
 ```
+
+### Dashboard URLs
+
+Production and staging each run their own `dashboard` Service, and each URL
+points at exactly one of them:
+
+| URL | Environment | Reaches | Audience |
+|---|---|---|---|
+| `https://behavior-dashboard.taildcd567.ts.net/` | production | `dashboard.behavior` via `tailscale-dashboard-ingress.yaml` (Funnel) | public |
+| `https://chris.taildcd567.ts.net/` | staging | `dashboard.behavior-staging`, node port 8092 | tailnet only |
+
+The staging URL is the k3s node's own Tailscale name, so it is configured on
+the node with `tailscale serve`, not in Kubernetes. Run on the node once staging
+is deployed (`curl -f http://localhost:8092/healthz` returns `ok`):
+
+```sh
+sudo tailscale serve --bg 8092   # https://chris.<tailnet>.ts.net/ -> staging dashboard
+tailscale serve status           # must show 8092; never 8082 (production)
+```
+
+Never enable Funnel on the node (`tailscale funnel`); staging stays private.
 
 ## 3. Create Kafka topics
 
