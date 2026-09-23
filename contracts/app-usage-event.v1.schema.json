@@ -31,19 +31,19 @@
       "minLength": 1,
       "maxLength": 100,
       "description": "Required for OPEN events. CLOSE events infer apps from active sessions for the device.",
-      "pattern": "^(?=.*[A-Za-z0-9])[^\\r\\n]+$"
+      "pattern": "^(?=[\\s\\S]*[A-Za-z0-9])(?:\\s|[^\\u0000-\\u001F\\u007F])+$"
     },
     "source": {
       "type": "string",
       "minLength": 1,
       "maxLength": 100,
-      "pattern": "^(?=.*[A-Za-z0-9])[^\\r\\n]+$"
+      "pattern": "^(?=[\\s\\S]*[A-Za-z0-9])(?:\\s|[^\\u0000-\\u001F\\u007F])+$"
     },
     "deviceId": {
       "type": "string",
       "minLength": 1,
       "maxLength": 100,
-      "pattern": "^(?=.*[A-Za-z0-9])[^\\r\\n]+$"
+      "pattern": "^(?=[\\s\\S]*[A-Za-z0-9])(?:\\s|[^\\u0000-\\u001F\\u007F])+$"
     }
   },
   "allOf": [

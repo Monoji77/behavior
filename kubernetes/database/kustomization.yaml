@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# TimescaleDB, bundled so an overlay can include it as a directory (kustomize
+# cannot reference individual files outside an overlay's own folder).
+# Production still applies these two files manually (see ../README.md);
+# staging includes this directory so Argo CD runs its own database.
+resources:
+  - timescaledb-init.yaml
+  - timescaledb.yaml

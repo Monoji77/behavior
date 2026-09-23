@@ -1,0 +1,40 @@
+# Hard cap on everything staging can claim on the shared k3s node, so it
+# cannot starve production. Sized for the steady state (~0.75 CPU / ~1.3Gi
+# requested) plus one rolling-update surge per Deployment and the topic Job.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: behavior-staging
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 3Gi
+    limits.cpu: "6"
+    limits.memory: 5Gi
+    pods: "12"
+    persistentvolumeclaims: "2"
+    requests.storage: 10Gi
+    services.loadbalancers: "2"
+---
+# A quota on CPU/memory rejects pods that omit requests/limits; these
+# defaults cover any container that does, and cap any single container.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: behavior-staging
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      default:
+        cpu: 250m
+        memory: 256Mi
+      max:
+        cpu: "1"
+        memory: 1Gi

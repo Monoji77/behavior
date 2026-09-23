@@ -28,7 +28,7 @@ The Kafka username/password must match in all three local files.
 ```powershell
 kubectl apply -f .\kubernetes\namespace.yaml
 kubectl apply -f .\kubernetes\behavior-db-config.yaml
-kubectl apply -f .\kubernetes\timescaledb-init.yaml
+kubectl apply -f .\kubernetes\database\timescaledb-init.yaml
 kubectl apply -f .\kubernetes\behavior-secrets.local.yaml
 kubectl apply -f .\kubernetes\kafka-sasl.local.yaml
 kubectl apply -f .\kubernetes\kafka-jaas.local.yaml
@@ -37,7 +37,7 @@ kubectl apply -f .\kubernetes\kafka-jaas.local.yaml
 kubectl apply -f .\kubernetes\tailscale-db-service.yaml
 kubectl apply -f .\kubernetes\tailscale-dashboard-ingress.yaml
 
-kubectl apply -f .\kubernetes\timescaledb.yaml
+kubectl apply -f .\kubernetes\database\timescaledb.yaml
 kubectl apply -f .\kubernetes\kafka-svc.yaml
 kubectl apply -f .\kubernetes\kafka-bootstrap-service.yaml
 kubectl apply -f .\kubernetes\kafka-stateful-set.yaml
@@ -50,6 +50,33 @@ kubectl rollout status statefulset/kafka -n kafka --timeout=300s
 kubectl apply -f .\argocd\behavior-staging-app.yaml
 ```
 
+### Staging secrets
+
+Staging runs its own database and ingestion endpoint, so it needs its own
+secrets in `behavior-staging` before Argo CD syncs it. Use a **new** database
+password and collector token, not production's:
+
+```sh
+kubectl create namespace behavior-staging --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n behavior-staging create secret generic behavior-secrets \
+  --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 24)" \
+  --from-literal=INGESTION_COLLECTOR_TOKEN="$(openssl rand -hex 24)" \
+  --dry-run=client -o yaml | kubectl apply -f -
+# Kafka has a single SCRAM user; staging reuses it (isolation is by topic).
+kubectl get secret behavior-kafka-client -n behavior -o yaml \
+  | sed -e '/namespace:/d' -e '/resourceVersion:/d' -e '/uid:/d' -e '/creationTimestamp:/d' \
+  | kubectl apply -n behavior-staging -f -
+```
+
+TimescaleDB only reads `POSTGRES_PASSWORD` when it first creates its data
+volume. To change it later, update the Secret and run `ALTER USER` in the
+staging database, or delete staging's `data-timescaledb-0` PVC to start over.
+
+To read the staging collector token: `kubectl -n behavior-staging get secret
+behavior-secrets -o jsonpath='{.data.INGESTION_COLLECTOR_TOKEN}' | base64 -d`.
+Send test events to `http://<node>:18090/api/v1/events` as in
+`docs/local-development.md`; they land only in staging's topic and database.
+
 ### Dashboard URLs
 
 Production and staging each run their own `dashboard` Service, and each URL
@@ -61,13 +88,21 @@ points at exactly one of them:
 | `https://chris.taildcd567.ts.net/` | staging | `dashboard.behavior-staging`, node port 8092 | tailnet only |
 
 The staging URL is the k3s node's own Tailscale name, so it is configured on
-the node with `tailscale serve`, not in Kubernetes. Run on the node once staging
-is deployed (`curl -f http://localhost:8092/healthz` returns `ok`):
+the node with `tailscale serve`, not in Kubernetes. Tailscale runs inside WSL
+(not on the Windows host), and the same node also serves other routes (Argo CD on
+`:8445`), so replace only the 443 handler. Once staging is deployed
+(`curl -f http://127.0.0.1:8092/healthz` returns `ok`), from Windows:
 
-```sh
-sudo tailscale serve --bg 8092   # https://chris.<tailnet>.ts.net/ -> staging dashboard
-tailscale serve status           # must show 8092; never 8082 (production)
+```powershell
+wsl.exe -d Ubuntu -u root -- tailscale serve status   # 443 currently -> 127.0.0.1:8082?
+wsl.exe -d Ubuntu -u root -- tailscale serve --bg --https=443 http://127.0.0.1:8092
+wsl.exe -d Ubuntu -u root -- tailscale serve status   # 443 -> :8092; :8445 unchanged
 ```
+
+Never run `tailscale serve reset`, which removes every route. To roll back, rerun
+the second command with `8082`. Verify from another tailnet device: a curl from
+the node to its own tailnet hostname returns a Tailscale 404 even when the route
+is correct.
 
 Never enable Funnel on the node (`tailscale funnel`); staging stays private.
 

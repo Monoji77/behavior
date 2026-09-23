@@ -15,12 +15,12 @@ import org.junit.jupiter.api.Test;
 class UsageEventRequestTest {
 
     @Test
-    void acceptsFriendlyShortcutIdentifiersAndNormalizesThemToStableSlugs() {
+    void acceptsFriendlyShortcutIdentifiersAndKeepsThemExactlyAsSent() {
         UsageEventRequest event = new UsageEventRequest(
                 UUID.randomUUID(),
                 Instant.parse("2026-08-31T06:24:00.123456789Z"),
                 UsageEventRequest.EventType.OPEN,
-                "Google Maps",
+                "  Google Maps\n",
                 "iPhone-Shortcut",
                 "iPhone 16 Pro [Personal]"
         );
@@ -35,9 +35,9 @@ class UsageEventRequestTest {
                 Instant.parse("2026-08-31T06:24:00.123Z"),
                 normalized.occurredAt()
         );
-        assertEquals("google-maps", normalized.app());
-        assertEquals("iphone-shortcut", normalized.source());
-        assertEquals("iphone-16-pro-personal", normalized.deviceId());
+        assertEquals("Google Maps", normalized.app());
+        assertEquals("iPhone-Shortcut", normalized.source());
+        assertEquals("iPhone 16 Pro [Personal]", normalized.deviceId());
         assertEquals(event.eventId(), normalized.eventId());
     }
 
@@ -69,5 +69,28 @@ class UsageEventRequestTest {
         assertFalse(Validation.buildDefaultValidatorFactory().getValidator()
                 .validate(openWithoutApp)
                 .isEmpty());
+    }
+
+    @Test
+    void acceptsAnyWhitespaceButRejectsOtherControlCharacters() {
+        var validator = Validation.buildDefaultValidatorFactory().getValidator();
+
+        for (String app : new String[] {"Google Maps", "Google\tMaps", "Google\nMaps", "Google\r\nMaps"}) {
+            assertTrue(validator.validate(open(app)).isEmpty(), app);
+        }
+        for (String app : new String[] {"Google\u0000Maps", "Google\u001BMaps", "Google\u007FMaps", " \t ", "---"}) {
+            assertFalse(validator.validate(open(app)).isEmpty(), app);
+        }
+    }
+
+    private static UsageEventRequest open(String app) {
+        return new UsageEventRequest(
+                UUID.randomUUID(),
+                Instant.now(),
+                UsageEventRequest.EventType.OPEN,
+                app,
+                "unit-test",
+                "iphone-test"
+        );
     }
 }
