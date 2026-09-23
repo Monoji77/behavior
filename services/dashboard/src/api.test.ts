@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterOptionsUrl, metricUrl, type Filters } from "./api";
+import { defaultSelection, filterOptionsUrl, longestSessionUrl, metricUrl, type FilterOptions, type Filters } from "./api";
 
 const filters: Filters = {
   deviceId: "phone-1",
@@ -10,10 +10,13 @@ const filters: Filters = {
 };
 
 describe("metricUrl", () => {
-  it("builds the latest-session request without a time range", () => {
-    expect(metricUrl("latest-session", filters)).toBe(
-      "/api/v1/metrics?metricName=latest-session&deviceId=phone-1&app=instagram"
-    );
+  it("builds the longest-session request for the 7 days up to now", () => {
+    const url = new URL(longestSessionUrl(filters, new Date("2026-09-23T10:00:00Z")), "http://dashboard.test");
+    expect(url.searchParams.get("metricName")).toBe("longest-session");
+    expect(url.searchParams.get("deviceId")).toBe("phone-1");
+    expect(url.searchParams.get("app")).toBe("instagram");
+    expect(url.searchParams.get("from")).toBe("2026-09-16T10:00:00.000Z");
+    expect(url.searchParams.get("to")).toBe("2026-09-23T10:00:00.000Z");
   });
 
   it("builds the rollup request with the required filters", () => {
@@ -27,5 +30,28 @@ describe("metricUrl", () => {
     expect(filterOptionsUrl()).toBe("/api/v1/metrics/filter-options");
     expect(filterOptionsUrl("phone 1")).toBe("/api/v1/metrics/filter-options?deviceId=phone+1");
     expect(filterOptionsUrl("phone 1", "instagram")).toBe("/api/v1/metrics/filter-options?deviceId=phone+1&app=instagram");
+  });
+});
+
+describe("defaultSelection", () => {
+  const options = (overrides: Partial<FilterOptions>): FilterOptions => ({
+    deviceIds: ["iPhone 16 Pro"], apps: ["Calendar", "Spotify"], earliestUsageAt: null, availableDates: [], topApp: "Calendar", ...overrides
+  });
+
+  it("picks the first device when none is selected", () => {
+    expect(defaultSelection("", "", options({}))).toEqual({ deviceId: "iPhone 16 Pro", done: false });
+  });
+
+  it("then picks the device's most-used app today", () => {
+    expect(defaultSelection("iPhone 16 Pro", "", options({}))).toEqual({ app: "Calendar", done: true });
+  });
+
+  it("never replaces an app that is already selected", () => {
+    expect(defaultSelection("iPhone 16 Pro", "Spotify", options({}))).toEqual({ done: true });
+  });
+
+  it("stops when there is no data to choose from", () => {
+    expect(defaultSelection("", "", options({ deviceIds: [] }))).toEqual({ done: true });
+    expect(defaultSelection("iPhone 16 Pro", "", options({ topApp: null }))).toEqual({ done: true });
   });
 });

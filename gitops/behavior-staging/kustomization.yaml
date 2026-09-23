@@ -44,10 +44,10 @@ patches:
   patch: "- op: add\n  path: /spec/template/spec/priorityClassName\n  value: behavior-staging-low"
 images:
 - name: ghcr.io/monoji77/behavior-ingestion-api
-  newTag: d534dd693d3a1b47fac4ebe78148844b476e55b0
+  newTag: bff134176d5971ea1f132139e43a7b6635bc0f07
 - name: ghcr.io/monoji77/behavior-stream-processor
-  newTag: d534dd693d3a1b47fac4ebe78148844b476e55b0
+  newTag: bff134176d5971ea1f132139e43a7b6635bc0f07
 - name: ghcr.io/monoji77/behavior-analytics-api
-  newTag: d534dd693d3a1b47fac4ebe78148844b476e55b0
+  newTag: bff134176d5971ea1f132139e43a7b6635bc0f07
 - name: ghcr.io/monoji77/behavior-dashboard
-  newTag: d534dd693d3a1b47fac4ebe78148844b476e55b0
+  newTag: bff134176d5971ea1f132139e43a7b6635bc0f07
