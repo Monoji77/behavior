@@ -85,3 +85,27 @@
 
 /* Current report card, sits left of the metrics tiles, vertically centered */
 .report-card{flex-shrink:0;max-width:22rem;width:22rem}
+.trend-title{align-items:center;display:flex;gap:.5rem}
+
+/* Mobile-only glass navigation: compact at rest, with the Home label on demand. */
+.glass-nav{display:none}
+
+@media(max-width:620px){
+  main{padding-bottom:calc(7.75rem + env(safe-area-inset-bottom))}
+  .sidebar{display:none}
+  .chart-touch-target{overscroll-behavior:contain;touch-action:none}
+  .glass-nav{align-items:center;bottom:max(.85rem,env(safe-area-inset-bottom));display:flex;justify-content:center;left:0;pointer-events:none;position:fixed;right:0;z-index:30}
+  .glass-nav__home{align-items:center;background:color-mix(in srgb,var(--surface) 67%,transparent);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border:1px solid color-mix(in srgb,var(--text) 14%,transparent);border-radius:999px;box-shadow:0 12px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.13);color:var(--text);display:inline-flex;gap:0;height:3.35rem;justify-content:center;overflow:hidden;padding:0;pointer-events:auto;transition:background .25s ease,border-color .25s ease,box-shadow .28s ease,width .34s cubic-bezier(.2,.9,.2,1.05);width:3.35rem}
+  .glass-nav__home:active{transform:scale(.94)}
+  .glass-nav__home:focus-visible{box-shadow:0 0 0 3px var(--accent-soft),0 12px 34px rgba(0,0,0,.24);outline:0}
+  .glass-nav__home.is-expanded{background:color-mix(in srgb,var(--surface) 82%,transparent);border-color:color-mix(in srgb,var(--accent-bright) 43%,var(--line));box-shadow:0 14px 38px color-mix(in srgb,var(--accent) 19%,rgba(0,0,0,.26)),inset 0 1px 0 rgba(255,255,255,.16);width:7.6rem}
+  .glass-nav__icon{align-items:center;background:var(--accent-soft);border-radius:50%;color:var(--accent-bright);display:inline-flex;flex:0 0 2.35rem;height:2.35rem;justify-content:center;transition:background .25s ease,color .25s ease,transform .34s cubic-bezier(.2,.9,.2,1.2);width:2.35rem}
+  .glass-nav__home.is-expanded .glass-nav__icon{background:var(--accent);color:#fff;transform:rotate(-7deg) scale(1.04)}
+  .glass-nav__icon svg{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8;height:1.08rem;width:1.08rem}
+  .glass-nav__label{color:var(--text);font-size:.78rem;font-weight:750;letter-spacing:.01em;max-width:0;opacity:0;overflow:hidden;transform:translateX(-.45rem);transition:max-width .25s ease .04s,opacity .18s ease,transform .28s ease;white-space:nowrap}
+  .glass-nav__home.is-expanded .glass-nav__label{max-width:3.25rem;opacity:1;transform:translateX(0)}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .glass-nav__home,.glass-nav__icon,.glass-nav__label{transition:none}
+}
