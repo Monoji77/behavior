@@ -1,0 +1,57 @@
+# Creates staging's own Kafka topics before every sync (idempotent). Same
+# partition/replication layout as production's topics; the dead-letter topic
+# needs at least as many partitions as the raw topics, since dead-lettered
+# records keep their source partition number.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: staging-kafka-topics
+  namespace: behavior-staging
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-topics
+          image: apache/kafka:4.2.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KAFKA_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: behavior-kafka-client
+                  key: username
+            - name: KAFKA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: behavior-kafka-client
+                  key: password
+            - name: KAFKA_HEAP_OPTS
+              value: -Xmx256m
+          command:
+            - sh
+            - -ec
+            - |
+              cat > /tmp/client.properties <<PROPS
+              security.protocol=SASL_PLAINTEXT
+              sasl.mechanism=SCRAM-SHA-512
+              sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="$KAFKA_USERNAME" password="$KAFKA_PASSWORD";
+              PROPS
+              for topic in staging.app-usage-events.raw.v1 staging.app-usage-events.dlq.v1; do
+                /opt/kafka/bin/kafka-topics.sh \
+                  --bootstrap-server kafka-bootstrap.kafka.svc.cluster.local:9092 \
+                  --command-config /tmp/client.properties \
+                  --create --if-not-exists --topic "$topic" \
+                  --partitions 3 --replication-factor 3
+              done
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

@@ -28,7 +28,7 @@ The Kafka username/password must match in all three local files.
 ```powershell
 kubectl apply -f .\kubernetes\namespace.yaml
 kubectl apply -f .\kubernetes\behavior-db-config.yaml
-kubectl apply -f .\kubernetes\timescaledb-init.yaml
+kubectl apply -f .\kubernetes\database\timescaledb-init.yaml
 kubectl apply -f .\kubernetes\behavior-secrets.local.yaml
 kubectl apply -f .\kubernetes\kafka-sasl.local.yaml
 kubectl apply -f .\kubernetes\kafka-jaas.local.yaml
@@ -37,7 +37,7 @@ kubectl apply -f .\kubernetes\kafka-jaas.local.yaml
 kubectl apply -f .\kubernetes\tailscale-db-service.yaml
 kubectl apply -f .\kubernetes\tailscale-dashboard-ingress.yaml
 
-kubectl apply -f .\kubernetes\timescaledb.yaml
+kubectl apply -f .\kubernetes\database\timescaledb.yaml
 kubectl apply -f .\kubernetes\kafka-svc.yaml
 kubectl apply -f .\kubernetes\kafka-bootstrap-service.yaml
 kubectl apply -f .\kubernetes\kafka-stateful-set.yaml
@@ -49,6 +49,33 @@ kubectl rollout status statefulset/kafka -n kafka --timeout=300s
 # See docs/ci-cd.md for the two-stage (staging/production) promotion model.
 kubectl apply -f .\argocd\behavior-staging-app.yaml
 ```
+
+### Staging secrets
+
+Staging runs its own database and ingestion endpoint, so it needs its own
+secrets in `behavior-staging` before Argo CD syncs it. Use a **new** database
+password and collector token, not production's:
+
+```sh
+kubectl create namespace behavior-staging --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n behavior-staging create secret generic behavior-secrets \
+  --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 24)" \
+  --from-literal=INGESTION_COLLECTOR_TOKEN="$(openssl rand -hex 24)" \
+  --dry-run=client -o yaml | kubectl apply -f -
+# Kafka has a single SCRAM user; staging reuses it (isolation is by topic).
+kubectl get secret behavior-kafka-client -n behavior -o yaml \
+  | sed -e '/namespace:/d' -e '/resourceVersion:/d' -e '/uid:/d' -e '/creationTimestamp:/d' \
+  | kubectl apply -n behavior-staging -f -
+```
+
+TimescaleDB only reads `POSTGRES_PASSWORD` when it first creates its data
+volume. To change it later, update the Secret and run `ALTER USER` in the
+staging database, or delete staging's `data-timescaledb-0` PVC to start over.
+
+To read the staging collector token: `kubectl -n behavior-staging get secret
+behavior-secrets -o jsonpath='{.data.INGESTION_COLLECTOR_TOKEN}' | base64 -d`.
+Send test events to `http://<node>:18090/api/v1/events` as in
+`docs/local-development.md`; they land only in staging's topic and database.
 
 ### Dashboard URLs
 
