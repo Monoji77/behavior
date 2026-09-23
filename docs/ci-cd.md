@@ -57,6 +57,11 @@ Because `promote.py` always operates on the current tip of main (aborting as
 superseded otherwise), there's no way to cherry-pick an older commit; production
 promotion always means "ship what's currently in staging."
 
+Each environment has its own dashboard URL, and a URL is only ever served by its
+own environment's `dashboard` Service: staging at `https://chris.taildcd567.ts.net/`
+(tailnet only) and production at `https://behavior-dashboard.taildcd567.ts.net/`
+(public). See the Dashboard URLs section of `kubernetes/README.md` for setup.
+
 ## Operations
 
 The deploy/homelab branch is bootstrapped from the previous main snapshot so the
