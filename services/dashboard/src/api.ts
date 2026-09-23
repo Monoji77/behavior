@@ -29,6 +29,7 @@ export interface UsageRollup {
 export interface DashboardData {
   longestSession: Session | null;
   rollups: UsageRollup[];
+  topApps: TopApp[];
 }
 
 export interface FilterOptions {
@@ -37,6 +38,13 @@ export interface FilterOptions {
   earliestUsageAt: string | null;
   availableDates: string[];
   topApp: string | null;
+  appIcons: Record<string, string>;
+}
+
+export interface TopApp {
+  app: string;
+  usageMilliseconds: number;
+  iconUrl: string | null;
 }
 
 export type DefaultSelection = { deviceId?: string; app?: string; done: boolean };
@@ -53,6 +61,10 @@ export function defaultSelection(deviceId: string, app: string, options: FilterO
 
 interface SessionResponse {
   session: Session;
+}
+
+interface TopAppsResponse {
+  apps: TopApp[];
 }
 
 interface UsageRollupResponse {
@@ -83,14 +95,24 @@ export function metricUrl(metricName: string, filters: Filters): string {
   return `/api/v1/metrics?${search.toString()}`;
 }
 
+const pastWeek = (now: Date) => ({
+  from: new Date(now.getTime() - WEEK_MILLISECONDS).toISOString(),
+  to: now.toISOString()
+});
+
+// The device's most-used apps over the 7 days up to now.
+export function topAppsUrl(deviceId: string, now = new Date(), limit = 3): string {
+  const search = new URLSearchParams({ deviceId, ...pastWeek(now), limit: String(limit) });
+  return `/api/v1/metrics/top-apps?${search.toString()}`;
+}
+
 // Always the 7 days up to now, independent of the chart's selected range.
 export function longestSessionUrl(filters: Pick<Filters, "deviceId" | "app">, now = new Date()): string {
   const search = new URLSearchParams({
     metricName: "longest-session",
     deviceId: filters.deviceId,
     app: filters.app,
-    from: new Date(now.getTime() - WEEK_MILLISECONDS).toISOString(),
-    to: now.toISOString()
+    ...pastWeek(now)
   });
   return `/api/v1/metrics?${search.toString()}`;
 }
@@ -129,11 +151,13 @@ export async function loadDashboard(filters: Filters): Promise<DashboardData> {
       throw error;
     });
   const rollups = getJson<UsageRollupResponse>(metricUrl("usage-rollup", filters));
+  const topApps = getJson<TopAppsResponse>(topAppsUrl(filters.deviceId));
 
-  const [longestSession, rollupResponse] = await Promise.all([longest, rollups]);
+  const [longestSession, rollupResponse, topAppsResponse] = await Promise.all([longest, rollups, topApps]);
 
   return {
     longestSession,
-    rollups: rollupResponse.buckets
+    rollups: rollupResponse.buckets,
+    topApps: topAppsResponse.apps
   };
 }
