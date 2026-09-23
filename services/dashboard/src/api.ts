@@ -56,6 +56,45 @@ export function selectedAppRank(topApps: TopApp[] | undefined, app: string): App
   return app && position >= 0 ? { position, entry: topApps![position] } : null;
 }
 
+export interface UsagePoint {
+  bucketStart: string;
+  usageMilliseconds: number;
+}
+
+// Every hour (or day) from the range's start to its end, with zero where there was
+// no usage, so the chart always spans 00:00 of the start date to 23:59 of the end date.
+// Range bounds are local "YYYY-MM-DDTHH:mm"; buckets are matched by instant.
+export function fillUsageBuckets(buckets: Pick<UsageRollup, "bucketStart" | "usageMilliseconds">[], from: string, to: string, granularity: Granularity): UsagePoint[] {
+  const usage = new Map(buckets.map((bucket) => [Date.parse(bucket.bucketStart), bucket.usageMilliseconds]));
+  const cursor = new Date(from);
+  const end = new Date(to);
+  if (granularity === "DAY") cursor.setHours(0, 0, 0, 0); else cursor.setMinutes(0, 0, 0);
+  const points: UsagePoint[] = [];
+  while (cursor <= end && points.length < 24 * 400) {
+    const at = cursor.getTime();
+    points.push({ bucketStart: cursor.toISOString(), usageMilliseconds: usage.get(at) ?? 0 });
+    usage.delete(at);
+    if (granularity === "DAY") cursor.setDate(cursor.getDate() + 1); else cursor.setHours(cursor.getHours() + 1);
+  }
+  // Keep any bucket that didn't line up (e.g. a different timezone's day boundary).
+  for (const [at, usageMilliseconds] of usage) points.push({ bucketStart: new Date(at).toISOString(), usageMilliseconds });
+  return points.sort((a, b) => Date.parse(a.bucketStart) - Date.parse(b.bucketStart));
+}
+
+const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
+const shiftIsoDay = (day: string, days: number) => new Date(Date.parse(day + "T00:00:00Z") + days * DAY_MILLISECONDS).toISOString().slice(0, 10);
+
+// Range to show for a selection, from its days with data (ascending YYYY-MM-DD):
+// the last 3 days ending on the latest day with data, or every day when the data
+// spans fewer than 3 days. Null when there is no data yet.
+export function defaultDateRange(availableDates: string[]): { from: string; to: string } | null {
+  if (!availableDates.length) return null;
+  const last = availableDates[availableDates.length - 1];
+  const threeDaysBack = shiftIsoDay(last, -2);
+  const first = availableDates[0] > threeDaysBack ? availableDates[0] : threeDaysBack;
+  return { from: first + "T00:00", to: last + "T23:59" };
+}
+
 export type DefaultSelection = { deviceId?: string; app?: string; done: boolean };
 
 // On first load: pick a device, then that device's most-used app today.

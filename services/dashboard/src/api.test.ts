@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { dashboardUrl, defaultSelection, filterOptionsUrl, loadDashboard, selectedAppRank, type FilterOptions, type Filters } from "./api";
+import { dashboardUrl, defaultDateRange, defaultSelection, fillUsageBuckets, filterOptionsUrl, loadDashboard, selectedAppRank, type FilterOptions, type Filters } from "./api";
 
 const filters: Filters = {
   deviceId: "phone-1",
@@ -103,6 +103,45 @@ describe("selectedAppRank", () => {
     expect(selectedAppRank(topApps, "Calendar")).toBeNull();
     expect(selectedAppRank(undefined, "Spotify")).toBeNull();
     expect(selectedAppRank(topApps, "")).toBeNull();
+  });
+});
+
+describe("defaultDateRange", () => {
+  it("shows the last 3 days ending on the latest day with data", () => {
+    expect(defaultDateRange(["2026-09-17", "2026-09-20", "2026-09-22", "2026-09-23"]))
+      .toEqual({ from: "2026-09-21T00:00", to: "2026-09-23T23:59" });
+  });
+
+  it("shows every day when the data spans fewer than 3 days", () => {
+    expect(defaultDateRange(["2026-09-22", "2026-09-23"])).toEqual({ from: "2026-09-22T00:00", to: "2026-09-23T23:59" });
+    expect(defaultDateRange(["2026-09-23"])).toEqual({ from: "2026-09-23T00:00", to: "2026-09-23T23:59" });
+  });
+
+  it("crosses month boundaries and handles no data", () => {
+    expect(defaultDateRange(["2026-09-28", "2026-10-01"])).toEqual({ from: "2026-09-29T00:00", to: "2026-10-01T23:59" });
+    expect(defaultDateRange([])).toBeNull();
+  });
+});
+
+describe("fillUsageBuckets", () => {
+  const at = (local: string) => new Date(local).toISOString();
+
+  it("spans every hour from the start date's 00:00 to the end date's 23:00, zero-filled", () => {
+    const points = fillUsageBuckets([{ bucketStart: at("2026-09-22T09:00"), usageMilliseconds: 60_000 }], "2026-09-22T00:00", "2026-09-23T23:59", "HOUR");
+    expect(points).toHaveLength(48);
+    expect(points[0]).toEqual({ bucketStart: at("2026-09-22T00:00"), usageMilliseconds: 0 });
+    expect(points[9].usageMilliseconds).toBe(60_000);
+    expect(points[47].bucketStart).toBe(at("2026-09-23T23:00"));
+  });
+
+  it("spans every day of the range in day view", () => {
+    const points = fillUsageBuckets([{ bucketStart: at("2026-09-22T00:00"), usageMilliseconds: 5 }], "2026-09-21T00:00", "2026-09-23T23:59", "DAY");
+    expect(points.map((point) => point.usageMilliseconds)).toEqual([0, 5, 0]);
+  });
+
+  it("keeps a bucket that doesn't line up with the local grid", () => {
+    const odd = { bucketStart: "2026-09-22T00:30:00.000Z", usageMilliseconds: 7 };
+    expect(fillUsageBuckets([odd], "2026-09-22T00:00", "2026-09-22T23:59", "HOUR")).toContainEqual(odd);
   });
 });
 

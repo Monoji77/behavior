@@ -4,7 +4,7 @@ import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppIcon } from "./AppIcon";
 import { FilterMenu } from "./FilterMenu";
-import { type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, defaultSelection, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
+import { type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, defaultDateRange, defaultSelection, fillUsageBuckets, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
 import { RefreshButton, type RefreshStatus } from "./RefreshButton";
@@ -52,9 +52,14 @@ function TrendTooltip({ active, payload, granularity }: Partial<TooltipContentPr
   return <div className="trend-tooltip"><strong>{duration(bucket.usageMilliseconds)}</strong><span>{axisLabel(bucket.bucketStart, granularity)}</span></div>;
 }
 
-function Trend({ data, granularity }: { data: DashboardData["rollups"]; granularity: Granularity }) {
-  if (!data.length) return <div className="chart-empty">No activity was recorded for this range.</div>;
+function Trend({ rollups, from, to, granularity }: { rollups: DashboardData["rollups"]; from: string; to: string; granularity: Granularity }) {
+  if (!rollups.length) return <div className="chart-empty">No activity was recorded for this range.</div>;
+  const data = fillUsageBuckets(rollups, from, to, granularity);
   const max = Math.max(...data.map(({ usageMilliseconds }) => usageMilliseconds), 1);
+  // Whole-minute ticks (0, 1, 2… or 0, 10, 20…) so small peaks don't read "0 min" several times.
+  const maxMinutes = Math.max(1, Math.ceil(max / 60_000));
+  const tickStep = Math.max(1, Math.ceil(maxMinutes / 4));
+  const yTicks = Array.from({ length: Math.ceil(maxMinutes / tickStep) + 1 }, (_, index) => index * tickStep * 60_000);
   return <div className="trend-wrap">
     <ChartContainer config={trendConfig} className="aspect-auto h-[260px] w-full">
       <AreaChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
@@ -66,9 +71,9 @@ function Trend({ data, granularity }: { data: DashboardData["rollups"]; granular
         </defs>
         <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="4 5" />
         <XAxis dataKey="bucketStart" tickLine={false} axisLine={false} tickMargin={10} minTickGap={40} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: string) => axisLabel(value, granularity)} />
-        <YAxis tickLine={false} axisLine={false} width={52} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: number) => Math.round(value / 60_000) + " min"} />
+        <YAxis ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={52} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: number) => Math.round(value / 60_000) + " min"} />
         <ChartTooltip cursor={{ stroke: "var(--color-usage)", strokeDasharray: "3 3" }} content={<TrendTooltip granularity={granularity} />} />
-        <Area dataKey="usageMilliseconds" type="monotone" fill="url(#trendFill)" stroke="var(--color-usage)" strokeWidth={3} dot={{ r: 3, fill: "var(--panel)", stroke: "var(--color-usage)", strokeWidth: 2 }} activeDot={{ r: 5, fill: "var(--color-usage)", stroke: "var(--panel)", strokeWidth: 2 }} />
+        <Area dataKey="usageMilliseconds" type="monotone" fill="url(#trendFill)" stroke="var(--color-usage)" strokeWidth={3} dot={(props: { cx?: number; cy?: number; index?: number; payload?: { usageMilliseconds: number } }) => props.payload?.usageMilliseconds ? <circle key={props.index} cx={props.cx} cy={props.cy} r={3} fill="var(--panel)" stroke="var(--color-usage)" strokeWidth={2} /> : <g key={props.index} />} activeDot={{ r: 5, fill: "var(--color-usage)", stroke: "var(--panel)", strokeWidth: 2 }} />
       </AreaChart>
     </ChartContainer>
     <div className="chart-key"><span><i /> Usage time (minutes)</span><span>Peak: {duration(max)}</span></div>
@@ -84,7 +89,8 @@ function App() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
-  const hasAppliedDefaultDate = useRef(false);
+  // Device|app whose default date range has been applied; the report waits for it.
+  const [rangeKey, setRangeKey] = useState("");
   const hasAppliedDefaultSelection = useRef(false);
   const loadController = useRef<AbortController | null>(null);
   const rank = selectedAppRank(data?.topApps, filters.app);
@@ -95,6 +101,8 @@ function App() {
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("behavior-theme", theme); }, [theme]);
   useEffect(() => {
     let cancelled = false;
+    const selectionKey = filters.deviceId + "|" + filters.app;
+    setRangeKey("");
     setOptionsLoading(true);
     loadFilterOptions(filters.deviceId, filters.app)
       .then((options) => {
@@ -105,14 +113,16 @@ function App() {
           hasAppliedDefaultSelection.current = done;
           if (selection.deviceId || selection.app) setFilters((current) => ({ ...current, ...selection }));
         }
-        if (!hasAppliedDefaultDate.current && options.availableDates.length) {
-          hasAppliedDefaultDate.current = true;
-          setFilters((current) => ({ ...current, ...threeDayRange(options.availableDates[options.availableDates.length - 1]) }));
+        // Every device/app selection starts on its own recent data (see defaultDateRange).
+        if (filters.deviceId && filters.app) {
+          const range = defaultDateRange(options.availableDates);
+          if (range) setFilters((current) => ({ ...current, ...range }));
+          setRangeKey(selectionKey);
         }
       })
       // Keep the last good lists on failure (e.g. a 429 while switching quickly); emptying
-      // them would make the effect below clear the selected app.
-      .catch(() => undefined)
+      // them would make the effect below clear the selected app. Load with the current range.
+      .catch(() => { if (!cancelled) setRangeKey(selectionKey); })
       .finally(() => { if (!cancelled) setOptionsLoading(false); });
     return () => { cancelled = true; };
   }, [filters.deviceId, filters.app]);
@@ -122,11 +132,12 @@ function App() {
     }
   }, [optionsLoading, filterOptions.apps, filters.app]);
   useEffect(() => {
-    if (filters.deviceId && filters.app) {
+    // Wait for this selection's date range, so a switch costs one dashboard request.
+    if (filters.deviceId && filters.app && rangeKey === filters.deviceId + "|" + filters.app) {
       submit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.deviceId, filters.app, filters.from, filters.to, filters.granularity]);
+  }, [filters.deviceId, filters.app, filters.from, filters.to, filters.granularity, rangeKey]);
   function toggleTheme() { setSparkle(true); setTheme((current) => current === "dark" ? "light" : "dark"); window.setTimeout(() => setSparkle(false), 520); }
   async function submit(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -173,7 +184,7 @@ function App() {
           <div className="report-range"><span>Range</span><strong>{rangeLabel}</strong></div></article>
         <div className="metrics"><Metric label="Total Time Tracked" value={data ? duration(total) : "—"} detail={data ? rangeLabel : "Load a report to begin"} icon="◷"><div className="metric-secondary"><p>Time Tracked [ past week ]</p><strong>{data ? duration(data.pastWeekMilliseconds) : "—"}</strong></div></Metric><Metric id="session" label="Longest Session [ past week ]" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
       </section>
-      <section id="activity" className="activity"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
+      <section id="activity" className="activity"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend rollups={data.rollups} from={filters.from} to={filters.to} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
 </section>
 
     </main></div></TooltipProvider>;
