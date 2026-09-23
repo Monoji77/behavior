@@ -72,6 +72,18 @@ TimescaleDB only reads `POSTGRES_PASSWORD` when it first creates its data
 volume. To change it later, update the Secret and run `ALTER USER` in the
 staging database, or delete staging's `data-timescaledb-0` PVC to start over.
 
+To reach staging's database from your tailnet (e.g. a DB client), first add
+`"tag:behavior-db-staging": ["tag:k3s-operator"]` under `tagOwners` in the
+tailnet policy and allow your devices to reach it (as for `tag:behavior-db`),
+then:
+
+```sh
+kubectl apply -f kubernetes/tailscale-db-staging-service.yaml
+```
+
+Connect to `behavior-db-staging.<tailnet>.ts.net:5432`, database
+`usage_analytics`, user `usage_app`, with the staging Postgres password.
+
 To read the staging collector token: `kubectl -n behavior-staging get secret
 behavior-secrets -o jsonpath='{.data.INGESTION_COLLECTOR_TOKEN}' | base64 -d`.
 Send test events to `http://<node>:18090/api/v1/events` as in
@@ -132,3 +144,17 @@ kubectl rollout status deployment/dashboard -n behavior --timeout=180s
 ```
 
 The service images must be built into Docker Desktop before the final step.
+
+## App icons
+
+The stream processor looks up each new app's icon in Apple's iTunes Search API
+every 5 minutes (10 apps per run) and stores it in `app_icons`; apps with no
+confident match get `source = 'none'` and are retried after 7 days, and the
+dashboard shows a letter instead. To set or fix an icon by hand (never
+overwritten by the lookup):
+
+```sql
+INSERT INTO app_icons (app, icon_url, source) VALUES ('Settings', 'https://…/icon.png', 'manual')
+ON CONFLICT (app) DO UPDATE SET icon_url = EXCLUDED.icon_url, source = 'manual', looked_up_at = NOW();
+```
+

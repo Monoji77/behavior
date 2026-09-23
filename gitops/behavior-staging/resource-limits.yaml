@@ -16,7 +16,9 @@ spec:
     pods: "12"
     persistentvolumeclaims: "2"
     requests.storage: 10Gi
-    services.loadbalancers: "2"
+    # dashboard, ingestion-api, and the manually applied tailnet DB Service
+    # (kubernetes/tailscale-db-staging-service.yaml).
+    services.loadbalancers: "3"
 ---
 # A quota on CPU/memory rejects pods that omit requests/limits; these
 # defaults cover any container that does, and cap any single container.
