@@ -29,10 +29,10 @@ patches:
   patch: "- op: replace\n  path: /spec/ports/0/port\n  value: 8092"
 images:
 - name: ghcr.io/monoji77/behavior-ingestion-api
-  newTag: 82f5965d23cacb51c225469339affc97d5f96d51
+  newTag: 28b369d852d2f40f2b7aad3a137d2585d522d595
 - name: ghcr.io/monoji77/behavior-stream-processor
-  newTag: 82f5965d23cacb51c225469339affc97d5f96d51
+  newTag: 28b369d852d2f40f2b7aad3a137d2585d522d595
 - name: ghcr.io/monoji77/behavior-analytics-api
-  newTag: 82f5965d23cacb51c225469339affc97d5f96d51
+  newTag: 28b369d852d2f40f2b7aad3a137d2585d522d595
 - name: ghcr.io/monoji77/behavior-dashboard
-  newTag: 82f5965d23cacb51c225469339affc97d5f96d51
+  newTag: 28b369d852d2f40f2b7aad3a137d2585d522d595
