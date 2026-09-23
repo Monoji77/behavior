@@ -46,7 +46,7 @@ function Combobox({ label, value, onChange, options, placeholder, loading }: { l
   const cancelClose = () => { if (closeTimer.current !== undefined) { window.clearTimeout(closeTimer.current); closeTimer.current = undefined; } };
   const close = () => { cancelClose(); closeTimer.current = window.setTimeout(() => { setOpen(false); setQuery(value); setFiltering(false); closeTimer.current = undefined; }, 120); };
   const select = (item: string) => { cancelClose(); onChange(item); setQuery(item); setOpen(false); setFiltering(false); };
-  return <label className="filter-pill combo-pill"><span>{label}</span><div className="combo-wrap"><input required role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} value={query} onFocus={() => { cancelClose(); setOpen(true); setFiltering(false); }} onBlur={close} onChange={(event) => { setQuery(event.target.value); setOpen(true); setFiltering(true); }} placeholder={placeholder} /> <Chevron />
+  return <label className="filter-pill combo-pill"><span>{label}</span><div className="combo-wrap"><input required role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} value={query} onFocus={() => { cancelClose(); setOpen(true); setFiltering(false); }} onBlur={close} onChange={(event) => { setQuery(event.target.value); setOpen(true); setFiltering(true); }} onKeyDown={(event) => { if (event.key === "Enter" && filtering && matches.length) { event.preventDefault(); select(matches[0]); } }} placeholder={placeholder} /> <Chevron />
     {open && <ul id={listId} role="listbox" className="option-list">{loading ? <li className="no-match">Loading available {label.toLocaleLowerCase()}s…</li> : matches.length ? matches.map((item) => <li key={item} role="option" aria-selected={item === value} onPointerDown={(event) => event.preventDefault()} onClick={() => select(item)}>{item}</li>) : <li className="no-match">No matching {label.toLocaleLowerCase()} found</li>}</ul>}
   </div></label>;
 }
@@ -137,7 +137,10 @@ function App() {
   }, [filters.deviceId, filters.app, filters.from, filters.to, filters.granularity]);
   function toggleTheme() { setSparkle(true); setTheme((current) => current === "dark" ? "light" : "dark"); window.setTimeout(() => setSparkle(false), 520); }
   async function submit(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault(); setRefreshStatus("loading"); setError(null);
+    event?.preventDefault();
+    // The inputs' `required` only sees typed text, not a chosen option; never query with nothing selected.
+    if (!filters.deviceId || !filters.app) { setData(null); setError("Choose a device and an app from the list."); return; }
+    setRefreshStatus("loading"); setError(null);
     try {
       setData(await loadDashboard(filters));
       setRefreshStatus("done");
