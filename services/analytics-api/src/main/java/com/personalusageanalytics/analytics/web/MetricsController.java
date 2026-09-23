@@ -3,12 +3,16 @@ package com.personalusageanalytics.analytics.web;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import com.personalusageanalytics.analytics.model.AnomalyCount;
 import com.personalusageanalytics.analytics.model.LatestSession;
 import com.personalusageanalytics.analytics.model.RollupGranularity;
+import com.personalusageanalytics.analytics.model.TopApp;
 import com.personalusageanalytics.analytics.model.UsageRollup;
 import com.personalusageanalytics.analytics.persistence.AnalyticsRepository;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
 import org.springframework.format.annotation.DateTimeFormat;
@@ -82,7 +86,26 @@ public class MetricsController {
                 analyticsRepository.findApps(deviceId),
                 earliestUsageAt,
                 availableDates,
-                topApp
+                topApp,
+                analyticsRepository.findAppIcons()
+        );
+    }
+
+    @GetMapping("/top-apps")
+    public TopAppsResponse topApps(
+            @RequestParam @NotBlank String deviceId,
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant from,
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant to,
+            @RequestParam(defaultValue = "3") @Min(1) @Max(10) int limit
+    ) {
+        validateTimeRange(from, to, "top-apps");
+
+        return new TopAppsResponse(
+                deviceId, from, to, analyticsRepository.findTopApps(deviceId, from, to, limit)
         );
     }
 
@@ -228,7 +251,17 @@ public class MetricsController {
             List<LocalDate> availableDates,
             // App with the most usage today (or on the most recent day with
             // usage) for the selected device; the dashboard's default app.
-            String topApp
+            String topApp,
+            // App Store icon URL per app, where one was found.
+            Map<String, String> appIcons
+    ) {
+    }
+
+    public record TopAppsResponse(
+            String deviceId,
+            Instant from,
+            Instant to,
+            List<TopApp> apps
     ) {
     }
 }

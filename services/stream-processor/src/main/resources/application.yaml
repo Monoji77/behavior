@@ -42,3 +42,9 @@ processor:
       abandonment-check-interval: PT1M
   rollups:
       daily-time-zone: Asia/Singapore
+  app-icons:
+      enabled: true
+      country: SG
+      batch-size: 10
+      lookup-interval: PT5M
+      retry-after: P7D

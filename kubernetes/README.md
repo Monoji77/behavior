@@ -144,3 +144,17 @@ kubectl rollout status deployment/dashboard -n behavior --timeout=180s
 ```
 
 The service images must be built into Docker Desktop before the final step.
+
+## App icons
+
+The stream processor looks up each new app's icon in Apple's iTunes Search API
+every 5 minutes (10 apps per run) and stores it in `app_icons`; apps with no
+confident match get `source = 'none'` and are retried after 7 days, and the
+dashboard shows a letter instead. To set or fix an icon by hand (never
+overwritten by the lookup):
+
+```sql
+INSERT INTO app_icons (app, icon_url, source) VALUES ('Settings', 'https://…/icon.png', 'manual')
+ON CONFLICT (app) DO UPDATE SET icon_url = EXCLUDED.icon_url, source = 'manual', looked_up_at = NOW();
+```
+
