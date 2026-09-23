@@ -1,43 +1,24 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: behavior-staging
+# Staging runs the full pipeline with its own database and Kafka topics:
+#   - ingestion-api writes only to staging.app-usage-events.raw.v1 (:18090)
+#   - stream-processor reads production's raw topic (real iPhone events) AND
+#     staging's raw topic (test events), under its own consumer group, so it
+#     never takes events from production; it dead-letters to staging's DLQ
+#   - its own TimescaleDB ("timescaledb" resolves within this namespace)
+# Kafka has no ACLs, so nothing but this config keeps staging off
+# production's topics; .github/scripts/check_staging_isolation.py enforces it
+# in CI. Production's database, topics and consumer group are never written.
 resources:
   - ../../kubernetes
-# Staging previews dashboard + analytics-api only. ingestion-api and
-# stream-processor own Kafka consumer groups / writes and must never be
-# duplicated -- a second copy would risk corrupting production data.
-# The close-events migration Job is a one-time schema fix already applied
-# to production; staging has no database of its own to run it against.
-# This cluster does not have the Prometheus Operator ServiceMonitor CRD.
+  - ../../kubernetes/database
+  - kafka-topics-job.yaml
+  - resource-limits.yaml
+  - priority-class.yaml
 patches:
-  - patch: |-
-      $patch: delete
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: ingestion-api
-        namespace: behavior
-  - patch: |-
-      $patch: delete
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: ingestion-api
-        namespace: behavior
-  - patch: |-
-      $patch: delete
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: ingestion-api-metrics
-        namespace: behavior
-  - patch: |-
-      $patch: delete
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: stream-processor
-        namespace: behavior
+  # One-time schema fix for production's existing database; staging's fresh
+  # database is created directly from the current init scripts.
   - patch: |-
       $patch: delete
       apiVersion: batch/v1
@@ -45,6 +26,7 @@ patches:
       metadata:
         name: timescaledb-close-events-migration
         namespace: behavior
+  # This cluster does not have the Prometheus Operator ServiceMonitor CRD.
   - patch: |-
       $patch: delete
       apiVersion: monitoring.coreos.com/v1
@@ -59,18 +41,15 @@ patches:
       metadata:
         name: analytics-api
         namespace: behavior
-  # analytics-api has no database of its own here -- read production's
-  # TimescaleDB cross-namespace instead (read-only, verified safe).
+  # k3s's Klipper LoadBalancer binds Service ports directly on the node, and
+  # production already claims 18080 (ingestion) and 8082 (dashboard).
   - target:
-      kind: Deployment
-      name: analytics-api
+      kind: Service
+      name: ingestion-api
     patch: |-
       - op: replace
-        path: /spec/template/spec/containers/0/env/0/value
-        value: timescaledb.behavior.svc.cluster.local
-  # k3s's Klipper LoadBalancer binds the Service port directly on the
-  # node's interfaces -- 8082 is already claimed by production's dashboard
-  # Service on the same node, so staging needs a different port.
+        path: /spec/ports/0/port
+        value: 18090
   - target:
       kind: Service
       name: dashboard
@@ -78,10 +57,48 @@ patches:
       - op: replace
         path: /spec/ports/0/port
         value: 8092
-# Promote a release by updating all four tags to the same published commit
-# SHA -- kept as 4 entries (matching production) even though ingestion-api
-# and stream-processor are deleted above, so promote.py's per-service
-# exact-match contract keeps working unmodified across both environments.
+  - target:
+      kind: Deployment
+      name: ingestion-api
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: INGESTION_TOPICS_RAWEVENTS
+          value: staging.app-usage-events.raw.v1
+  - target:
+      kind: Deployment
+      name: stream-processor
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: PROCESSOR_TOPICS_RAWEVENTS
+          value: app-usage-events.raw.v1,staging.app-usage-events.raw.v1
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: PROCESSOR_TOPICS_DEADLETTER
+          value: staging.app-usage-events.dlq.v1
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: SPRING_KAFKA_CONSUMER_GROUPID
+          value: raw-event-persistence-staging-v1
+  # Evicted before production under node pressure (see priority-class.yaml).
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: behavior-staging-low
+  - target:
+      kind: StatefulSet
+    patch: |-
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: behavior-staging-low
+# Promote a release by updating all four tags to the same published commit SHA.
 images:
   - name: ghcr.io/monoji77/behavior-ingestion-api
     newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"

@@ -1,4 +1,4 @@
-# Manually managed, like timescaledb.yaml and namespace.yaml (see the
+# Manually managed, like database/timescaledb.yaml and namespace.yaml (see the
 # allowlist comment in kubernetes/kustomization.yaml) -- not synced by
 # Argo CD. Exposes TimescaleDB on the tailnet with a stable MagicDNS name
 # (behavior-db.<your-tailnet>.ts.net) via the Tailscale Kubernetes operator,

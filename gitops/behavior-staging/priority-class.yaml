@@ -1,0 +1,14 @@
+# Staging pods rank below production (default priority 0), so under node
+# memory pressure the kubelet evicts staging first. preemptionPolicy: Never
+# means a pending staging pod can never evict a running production pod.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: behavior-staging-low
+  annotations:
+    # Must exist before any staging pod references it.
+    argocd.argoproj.io/sync-wave: "-1"
+value: -10
+preemptionPolicy: Never
+globalDefault: false
+description: Behavior staging workloads; evicted before production.

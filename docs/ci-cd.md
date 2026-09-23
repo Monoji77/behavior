@@ -44,11 +44,29 @@ arriving after the final check can start the next release cycle while the checke
 release is being pushed. This is not a cross-branch atomic transaction.
 
 **Staging** (`.github/workflows/java-ci.yml`'s `promote` job) runs automatically
-on every push to main, invoking `promote.py "$SOURCE_SHA" staging`. It has no
-database or Kafka of its own — its `analytics-api` reads production's TimescaleDB
-directly (read-only; verified analytics-api never writes), and it never runs
-`ingestion-api`/`stream-processor`, which own writes/Kafka consumer groups and
-must never be duplicated against the same topics/tables.
+on every push to main, invoking `promote.py "$SOURCE_SHA" staging`. It runs the
+full pipeline in `behavior-staging` with its own TimescaleDB and Kafka topics,
+sharing only the Kafka cluster (namespace `kafka`) and the k3s node:
+
+- `ingestion-api` (node port 18090) writes only to `staging.app-usage-events.raw.v1`.
+- `stream-processor` reads production's `app-usage-events.raw.v1` (your real
+  iPhone events) and `staging.app-usage-events.raw.v1` (test events) under its
+  own consumer group `raw-event-persistence-staging-v1`, so production's group
+  keeps every event; it dead-letters to `staging.app-usage-events.dlq.v1`.
+- `analytics-api` and `dashboard` read staging's own database, which is filled
+  from every event Kafka still retains the first time the staging consumer group starts.
+
+Kafka has no ACLs, so only configuration keeps staging off production's topics.
+CI's `validate` job renders both overlays and runs
+`.github/scripts/check_staging_isolation.py`, which fails the build if staging
+would write to a production topic, share production's consumer group, point at
+production's namespace, or reuse one of production's node ports. A
+ResourceQuota, LimitRange and low PriorityClass (`gitops/behavior-staging/`)
+cap staging's share of the node and make it the first to be evicted.
+
+Write-side changes (ingestion, sessionization, rollups) are therefore testable
+on staging against real events before production. See `kubernetes/README.md`
+for staging's secrets and sending a test event.
 
 **Production** (`.github/workflows/promote-production.yml`) only runs on manual
 `workflow_dispatch`, invoking `promote.py "$(git rev-parse HEAD)" homelab` against
