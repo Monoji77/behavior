@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultSelection, filterOptionsUrl, longestSessionUrl, metricUrl, topAppsUrl, type FilterOptions, type Filters } from "./api";
+import { defaultSelection, pastWeekUsageUrl, selectedAppRank, filterOptionsUrl, longestSessionUrl, metricUrl, topAppsUrl, type FilterOptions, type Filters } from "./api";
 
 const filters: Filters = {
   deviceId: "phone-1",
@@ -17,6 +17,15 @@ describe("metricUrl", () => {
     expect(url.searchParams.get("from")).toBe("2026-09-16T10:00:00.000Z");
     expect(url.searchParams.get("to")).toBe("2026-09-23T10:00:00.000Z");
     expect(url.searchParams.get("limit")).toBe("3");
+  });
+
+  it("builds the past-week usage request for the selected app", () => {
+    const url = new URL(pastWeekUsageUrl(filters, new Date("2026-09-23T10:00:00Z")), "http://dashboard.test");
+    expect(url.searchParams.get("metricName")).toBe("usage-rollup");
+    expect(url.searchParams.get("app")).toBe("instagram");
+    expect(url.searchParams.get("granularity")).toBe("HOUR");
+    expect(url.searchParams.get("from")).toBe("2026-09-16T10:00:00.000Z");
+    expect(url.searchParams.get("to")).toBe("2026-09-23T10:00:00.000Z");
   });
 
   it("builds the longest-session request for the 7 days up to now", () => {
@@ -64,3 +73,22 @@ describe("defaultSelection", () => {
     expect(defaultSelection("iPhone 16 Pro", "", options({ topApp: null }))).toEqual({ done: true });
   });
 });
+
+describe("selectedAppRank", () => {
+  const topApps = [
+    { app: "Telegram", usageMilliseconds: 3, iconUrl: null },
+    { app: "Spotify", usageMilliseconds: 2, iconUrl: null },
+    { app: "Shopee", usageMilliseconds: 1, iconUrl: null }
+  ];
+
+  it("returns the selected app's position when it is in the top 3", () => {
+    expect(selectedAppRank(topApps, "Spotify")).toEqual({ position: 1, entry: topApps[1] });
+  });
+
+  it("returns null when the selected app is not in the top 3 or nothing is loaded", () => {
+    expect(selectedAppRank(topApps, "Calendar")).toBeNull();
+    expect(selectedAppRank(undefined, "Spotify")).toBeNull();
+    expect(selectedAppRank(topApps, "")).toBeNull();
+  });
+});
+
