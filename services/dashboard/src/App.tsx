@@ -4,7 +4,7 @@ import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppIcon } from "./AppIcon";
 import { FilterMenu } from "./FilterMenu";
-import { type DashboardData, type Filters, type Granularity, type FilterOptions, defaultSelection, loadDashboard, loadFilterOptions } from "./api";
+import { type DashboardData, type Filters, type Granularity, type FilterOptions, defaultSelection, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
 import { RefreshButton, type RefreshStatus } from "./RefreshButton";
@@ -86,6 +86,7 @@ function App() {
   const [sparkle, setSparkle] = useState(false);
   const hasAppliedDefaultDate = useRef(false);
   const hasAppliedDefaultSelection = useRef(false);
+  const rank = selectedAppRank(data?.topApps, filters.app);
   const total = useMemo(() => data?.rollups.reduce((sum, item) => sum + item.usageMilliseconds, 0) ?? 0, [data]);
   const update = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value }));
 
@@ -152,7 +153,7 @@ function App() {
       {error && <p className="error" role="alert">{error}</p>}
       <section id="overview" className="overview-row" aria-label="Usage summary">
         <article className="panel report report-card"><div className="report-head"><p className="eyebrow">Current report</p><h2>{filters.app && <AppIcon app={filters.app} url={filterOptions.appIcons[filters.app]} size={30} />}{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p></div>
-          <ol className="top-apps" aria-label="Most used apps in the past week">{RANKS.map((rank, index) => { const entry = data?.topApps[index]; return <li key={rank} className={"rank rank-" + (index + 1)}><span className="rank-badge">{index + 1}</span><span className="rank-text"><small>{rank}</small><strong>{entry ? <>{<AppIcon app={entry.app} url={entry.iconUrl} size={18} />}{entry.app}</> : "—"}</strong></span><em>{entry ? duration(entry.usageMilliseconds) : ""}</em></li>; })}</ol>
+          {rank && <div className={"rank rank-" + (rank.position + 1)} aria-label={`${rank.entry.app} is this week's ${RANKS[rank.position].toLowerCase()}`}><span className="rank-badge">{rank.position + 1}</span><span className="rank-text"><small>{RANKS[rank.position]}</small><strong><AppIcon app={rank.entry.app} url={rank.entry.iconUrl} size={18} />{rank.entry.app}</strong></span><em>{duration(rank.entry.usageMilliseconds)}</em></div>}
           <div className="report-range"><span>Range</span><strong>{dayFromDateTime(filters.from) === dayFromDateTime(filters.to) ? formatDay(filters.from) : formatDay(filters.from) + " – " + formatDay(filters.to)}</strong></div></article>
         <div className="metrics"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric id="session" label="Longest session (past week)" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
       </section>

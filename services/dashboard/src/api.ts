@@ -47,6 +47,14 @@ export interface TopApp {
   iconUrl: string | null;
 }
 
+export type AppRank = { position: number; entry: TopApp };
+
+// The selected app's place in the week's top apps (0 = most used), or null if it isn't there.
+export function selectedAppRank(topApps: TopApp[] | undefined, app: string): AppRank | null {
+  const position = (topApps ?? []).findIndex((entry) => entry.app === app);
+  return app && position >= 0 ? { position, entry: topApps![position] } : null;
+}
+
 export type DefaultSelection = { deviceId?: string; app?: string; done: boolean };
 
 // On first load: pick a device, then that device's most-used app today.

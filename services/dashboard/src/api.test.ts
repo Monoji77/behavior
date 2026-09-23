@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultSelection, filterOptionsUrl, longestSessionUrl, metricUrl, topAppsUrl, type FilterOptions, type Filters } from "./api";
+import { defaultSelection, selectedAppRank, filterOptionsUrl, longestSessionUrl, metricUrl, topAppsUrl, type FilterOptions, type Filters } from "./api";
 
 const filters: Filters = {
   deviceId: "phone-1",
@@ -64,3 +64,22 @@ describe("defaultSelection", () => {
     expect(defaultSelection("iPhone 16 Pro", "", options({ topApp: null }))).toEqual({ done: true });
   });
 });
+
+describe("selectedAppRank", () => {
+  const topApps = [
+    { app: "Telegram", usageMilliseconds: 3, iconUrl: null },
+    { app: "Spotify", usageMilliseconds: 2, iconUrl: null },
+    { app: "Shopee", usageMilliseconds: 1, iconUrl: null }
+  ];
+
+  it("returns the selected app's position when it is in the top 3", () => {
+    expect(selectedAppRank(topApps, "Spotify")).toEqual({ position: 1, entry: topApps[1] });
+  });
+
+  it("returns null when the selected app is not in the top 3 or nothing is loaded", () => {
+    expect(selectedAppRank(topApps, "Calendar")).toBeNull();
+    expect(selectedAppRank(undefined, "Spotify")).toBeNull();
+    expect(selectedAppRank(topApps, "")).toBeNull();
+  });
+});
+
