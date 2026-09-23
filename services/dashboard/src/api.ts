@@ -48,6 +48,12 @@ export interface TopApp {
   iconUrl: string | null;
 }
 
+// App menu order: the week's top apps first (most used first), then the rest alphabetically.
+export function appsWithTopFirst(apps: string[], topApps: TopApp[] | undefined): string[] {
+  const top = (topApps ?? []).map((entry) => entry.app).filter((app) => apps.includes(app));
+  return [...top, ...apps.filter((app) => !top.includes(app))];
+}
+
 export type AppRank = { position: number; entry: TopApp };
 
 // The selected app's place in the week's top apps (0 = most used), or null if it isn't there.
