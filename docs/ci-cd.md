@@ -72,8 +72,11 @@ for staging's secrets and sending a test event.
 `workflow_dispatch`, invoking `promote.py "$(git rev-parse HEAD)" homelab` against
 whatever is currently the tip of main — i.e. whatever staging is already running.
 Because `promote.py` always operates on the current tip of main (aborting as
-superseded otherwise), there's no way to cherry-pick an older commit; production
-promotion always means "ship what's currently in staging."
+superseded otherwise), there's no way to cherry-pick an older commit. It also
+refuses (the run fails) unless all four image tags on deploy/staging already
+equal that commit, so production promotion always means "ship what's currently
+in staging." If it refuses, wait for the main CI run to finish its staging
+promotion, check staging, then run it again.
 
 Each environment has its own dashboard URL, and a URL is only ever served by its
 own environment's `dashboard` Service: staging at `https://chris.taildcd567.ts.net/`
