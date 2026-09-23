@@ -2,18 +2,30 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: behavior
 resources:
-- ../../kubernetes
+  - ../../kubernetes
+# This cluster does not have the Prometheus Operator ServiceMonitor CRD.
 patches:
-- patch: "$patch: delete\napiVersion: monitoring.coreos.com/v1\nkind: ServiceMonitor\n\
-    metadata:\n  name: ingestion-api\n  namespace: behavior"
-- patch: "$patch: delete\napiVersion: monitoring.coreos.com/v1\nkind: ServiceMonitor\n\
-    metadata:\n  name: analytics-api\n  namespace: behavior"
+  - patch: |-
+      $patch: delete
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: ingestion-api
+        namespace: behavior
+  - patch: |-
+      $patch: delete
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: analytics-api
+        namespace: behavior
+# Promote a release by updating all four tags to the same published commit SHA.
 images:
-- name: ghcr.io/monoji77/behavior-ingestion-api
-  newTag: ffe5674fc5f4380ebec47136fb04b0090f41dbcf
-- name: ghcr.io/monoji77/behavior-stream-processor
-  newTag: ffe5674fc5f4380ebec47136fb04b0090f41dbcf
-- name: ghcr.io/monoji77/behavior-analytics-api
-  newTag: ffe5674fc5f4380ebec47136fb04b0090f41dbcf
-- name: ghcr.io/monoji77/behavior-dashboard
-  newTag: ffe5674fc5f4380ebec47136fb04b0090f41dbcf
+  - name: ghcr.io/monoji77/behavior-ingestion-api
+    newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
+  - name: ghcr.io/monoji77/behavior-stream-processor
+    newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
+  - name: ghcr.io/monoji77/behavior-analytics-api
+    newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"
+  - name: ghcr.io/monoji77/behavior-dashboard
+    newTag: "e02d5f5599e2392388baa13be728ff5a922f8f89"

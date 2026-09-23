@@ -1,0 +1,29 @@
+name: Promote to production
+
+# Every push to main already auto-deploys to staging (see java-ci.yml's
+# promote job). Shipping to production is a separate, deliberate step:
+# run this workflow manually once you've checked staging.
+#
+# promote.py only ever promotes the current tip of main (it aborts as
+# "superseded" if main has moved on since the run started), so this always
+# ships exactly what staging is currently running -- there's no way to
+# cherry-pick an older commit, by design.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  promote:
+    name: Promote current main to homelab
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Always the actual tip of main, regardless of what ref happens
+          # to be selected when this is manually dispatched.
+          ref: main
+      - name: Install promotion parser
+        run: python3 -m pip install PyYAML==6.0.2
+      - name: Promote the current tip of main
+        run: python3 .github/scripts/promote.py "$(git rev-parse HEAD)" homelab

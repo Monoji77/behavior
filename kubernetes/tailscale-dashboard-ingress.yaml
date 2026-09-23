@@ -1,0 +1,35 @@
+# Manually managed, like timescaledb.yaml and namespace.yaml (see the
+# allowlist comment in kubernetes/kustomization.yaml) -- not synced by
+# Argo CD. Publicly exposes the dashboard via Tailscale Funnel with a
+# stable MagicDNS name (behavior-dashboard.<your-tailnet>.ts.net),
+# routing to the existing in-cluster "dashboard" Service, which stays
+# LAN/tailnet-only for anything that talks to it directly.
+#
+# Funnel needs HTTPS termination, which the Tailscale Kubernetes operator
+# only provides through an Ingress (a LoadBalancer Service, like
+# tailscale-db-service.yaml uses for TimescaleDB, is plain TCP forwarding
+# with no TLS -- fine for Postgres, not for HTTP).
+#
+# tag:behavior-dashboard must be defined with owner tag:k3s-operator in
+# the tailnet's ACL policy (Access controls -> Definitions -> Tags), and
+# that tag must be granted the "funnel" node attribute (Access controls
+# -> Policies -> JSON editor -> nodeAttrs), before the operator can serve
+# this publicly.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard-funnel
+  namespace: behavior
+  annotations:
+    tailscale.com/funnel: "true"
+    tailscale.com/tags: tag:behavior-dashboard
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: dashboard
+      port:
+        number: 8082
+  tls:
+    - hosts:
+        - behavior-dashboard
