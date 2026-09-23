@@ -4,7 +4,7 @@ import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppIcon } from "./AppIcon";
 import { FilterMenu } from "./FilterMenu";
-import { type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, defaultDateRange, defaultSelection, fillUsageBuckets, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
+import { type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, appsWithTopFirst, defaultDateRange, defaultSelection, fillUsageBuckets, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
 import { RefreshButton, type RefreshStatus } from "./RefreshButton";
@@ -173,7 +173,7 @@ function App() {
       <section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <FilterMenu loading={optionsLoading} fields={[
           { item: "Device", value: filters.deviceId, placeholder: "Choose a device", tooltip: "Select a device", options: filterOptions.deviceIds, onChange: (value) => update("deviceId", value) },
-          { item: "App", value: filters.app, placeholder: "Choose an app", tooltip: "Select an app", options: filterOptions.apps, icons: filterOptions.appIcons, onChange: (value) => update("app", value) }
+          { item: "App", value: filters.app, placeholder: "Choose an app", tooltip: "Select an app", options: appsWithTopFirst(filterOptions.apps, data?.topApps), icons: filterOptions.appIcons, onChange: (value) => update("app", value) }
         ]} />
         <RefreshButton status={refreshStatus} />
       </form></section>
