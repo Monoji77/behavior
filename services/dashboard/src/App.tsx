@@ -62,7 +62,7 @@ function Trend({ rollups, from, to, granularity }: { rollups: DashboardData["rol
   const tickStep = Math.max(1, Math.ceil(maxMinutes / 4));
   const yTicks = Array.from({ length: Math.ceil(maxMinutes / tickStep) + 1 }, (_, index) => index * tickStep * 60_000);
   return <div className="trend-wrap">
-    <ChartContainer config={trendConfig} className="aspect-auto h-[260px] w-full">
+    <ChartContainer config={trendConfig} className="chart-touch-target aspect-auto h-[260px] w-full">
       <AreaChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
         <defs>
           <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
@@ -186,7 +186,7 @@ function App() {
           <div className="report-range"><span>Range</span><strong>{rangeLabel}</strong></div></article>
         <div className="metrics"><Metric label="Total Time Tracked" value={data ? duration(total) : "—"} detail={data ? rangeLabel : "Load a report to begin"} icon="◷"><div className="metric-secondary"><p>Time Tracked [ past week ]</p><strong>{data ? duration(data.pastWeekMilliseconds) : "—"}</strong></div></Metric><Metric id="session" label="Longest Session [ past week ]" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
       </section>
-      <section id="activity" className="activity"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend rollups={data.rollups} from={filters.from} to={filters.to} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
+      <section id="activity" className="activity"><article className="panel trend-panel"><header><div><h2 className="trend-title">{filters.app || "Select an app"}{filters.app && <AppIcon app={filters.app} url={filterOptions.appIcons[filters.app]} size={26} />}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend rollups={data.rollups} from={filters.from} to={filters.to} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
 </section>
 
     </main>
