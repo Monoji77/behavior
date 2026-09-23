@@ -31,6 +31,7 @@ const formatDay = (value: string) => new Intl.DateTimeFormat(undefined, { month:
 
 function SunIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.7" /><path d="M12 2v2.1M12 19.9V22M4.93 4.93l1.49 1.49M17.58 17.58l1.49 1.49M2 12h2.1M19.9 12H22M4.93 19.07l1.49-1.49M17.58 6.42l1.49-1.49" /></svg>; }
 function MoonIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.7 15.1A8.6 8.6 0 0 1 8.9 3.3 8.7 8.7 0 1 0 20.7 15.1Z" /></svg>; }
+function HomeIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 10.7 8.5-7 8.5 7v9.1a1.7 1.7 0 0 1-1.7 1.7H5.2a1.7 1.7 0 0 1-1.7-1.7Z" /><path d="M9.2 21.5v-6.3h5.6v6.3" /></svg>; }
 
 function Metric({ id, label, value, detail, icon, tone = "violet", children }: { id?: string; label: string; value: string | number; detail?: string; icon: string; tone?: string; children?: ReactNode }) {
   return <article id={id} className="metric"><span className={"metric-icon " + tone}>{icon}</span><p>{label}</p><strong>{value}</strong>{detail && <small>{detail}</small>}{children}</article>;
@@ -61,7 +62,7 @@ function Trend({ rollups, from, to, granularity }: { rollups: DashboardData["rol
   const tickStep = Math.max(1, Math.ceil(maxMinutes / 4));
   const yTicks = Array.from({ length: Math.ceil(maxMinutes / tickStep) + 1 }, (_, index) => index * tickStep * 60_000);
   return <div className="trend-wrap">
-    <ChartContainer config={trendConfig} className="aspect-auto h-[260px] w-full">
+    <ChartContainer config={trendConfig} className="chart-touch-target aspect-auto h-[260px] w-full">
       <AreaChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
         <defs>
           <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
@@ -89,6 +90,7 @@ function App() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
+  const [navigationExpanded, setNavigationExpanded] = useState(false);
   // Device|app whose default date range has been applied; the report waits for it.
   const [rangeKey, setRangeKey] = useState("");
   const hasAppliedDefaultSelection = useRef(false);
@@ -169,7 +171,7 @@ function App() {
 
   return <TooltipProvider delay={150}><div className="shell">
     <aside className="sidebar"><a className="brand" href="#top"><b>U</b> Usage<span>OS</span></a><nav aria-label="Dashboard navigation"><a className="selected" href="#overview">▦ Overview</a><a href="#activity">⌁ Activity</a><a href="#session">◷ Sessions</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
-    <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>Usage overview</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button><b>CY</b></div></header>
+    <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>Usage overview</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
       <section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <FilterMenu loading={optionsLoading} fields={[
           { item: "Device", value: filters.deviceId, placeholder: "Choose a device", tooltip: "Select a device", options: filterOptions.deviceIds, onChange: (value) => update("deviceId", value) },
@@ -184,9 +186,16 @@ function App() {
           <div className="report-range"><span>Range</span><strong>{rangeLabel}</strong></div></article>
         <div className="metrics"><Metric label="Total Time Tracked" value={data ? duration(total) : "—"} detail={data ? rangeLabel : "Load a report to begin"} icon="◷"><div className="metric-secondary"><p>Time Tracked [ past week ]</p><strong>{data ? duration(data.pastWeekMilliseconds) : "—"}</strong></div></Metric><Metric id="session" label="Longest Session [ past week ]" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
       </section>
-      <section id="activity" className="activity"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend rollups={data.rollups} from={filters.from} to={filters.to} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
+      <section id="activity" className="activity"><article className="panel trend-panel"><header><div><h2 className="trend-title">{filters.app || "Select an app"}{filters.app && <AppIcon app={filters.app} url={filterOptions.appIcons[filters.app]} size={26} />}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend rollups={data.rollups} from={filters.from} to={filters.to} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
 </section>
 
-    </main></div></TooltipProvider>;
+    </main>
+    <nav className="glass-nav" aria-label="Primary navigation">
+      <button type="button" className={"glass-nav__home " + (navigationExpanded ? "is-expanded" : "")} aria-expanded={navigationExpanded} aria-label={navigationExpanded ? "Collapse Home navigation" : "Expand Home navigation"} onClick={() => setNavigationExpanded((current) => !current)}>
+        <span className="glass-nav__icon"><HomeIcon /></span>
+        <span className="glass-nav__label">Home</span>
+      </button>
+    </nav>
+  </div></TooltipProvider>;
 }
 export default App;
