@@ -1,5 +1,6 @@
 package com.personalusageanalytics.analytics.web;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -88,6 +89,41 @@ public class MetricsController {
                 availableDates,
                 topApp,
                 analyticsRepository.findAppIcons()
+        );
+    }
+
+    // Everything the dashboard shows for one device/app selection, in one request:
+    // the chart's rollups for [from, to), plus the past 7 days' total, longest
+    // session and top apps. Keeps an app switch to a single rate-limited call.
+    @GetMapping("/dashboard")
+    public DashboardResponse dashboard(
+            @RequestParam @NotBlank String deviceId,
+            @RequestParam @NotBlank String app,
+            @RequestParam @NotBlank String granularity,
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant from,
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant to
+    ) {
+        validateTimeRange(from, to, "dashboard");
+        RollupGranularity parsedGranularity = parseGranularity(granularity);
+        Instant weekTo = Instant.now();
+        Instant weekFrom = weekTo.minus(Duration.ofDays(7));
+
+        return new DashboardResponse(
+                deviceId,
+                app,
+                parsedGranularity,
+                from,
+                to,
+                analyticsRepository.findUsageRollups(deviceId, app, parsedGranularity, from, to),
+                weekFrom,
+                weekTo,
+                analyticsRepository.findUsageTotal(deviceId, app, weekFrom, weekTo),
+                analyticsRepository.findLongestSession(deviceId, app, weekFrom, weekTo).orElse(null),
+                analyticsRepository.findTopApps(deviceId, weekFrom, weekTo, 3)
         );
     }
 
@@ -254,6 +290,21 @@ public class MetricsController {
             String topApp,
             // App Store icon URL per app, where one was found.
             Map<String, String> appIcons
+    ) {
+    }
+
+    public record DashboardResponse(
+            String deviceId,
+            String app,
+            RollupGranularity granularity,
+            Instant from,
+            Instant to,
+            List<UsageRollup> buckets,
+            Instant weekFrom,
+            Instant weekTo,
+            long pastWeekMilliseconds,
+            LatestSession longestSession,
+            List<TopApp> topApps
     ) {
     }
 

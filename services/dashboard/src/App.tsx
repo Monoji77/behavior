@@ -4,7 +4,7 @@ import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppIcon } from "./AppIcon";
 import { FilterMenu } from "./FilterMenu";
-import { type DashboardData, type Filters, type Granularity, type FilterOptions, defaultSelection, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
+import { type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, defaultSelection, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
 import { RefreshButton, type RefreshStatus } from "./RefreshButton";
@@ -86,6 +86,7 @@ function App() {
   const [sparkle, setSparkle] = useState(false);
   const hasAppliedDefaultDate = useRef(false);
   const hasAppliedDefaultSelection = useRef(false);
+  const loadController = useRef<AbortController | null>(null);
   const rank = selectedAppRank(data?.topApps, filters.app);
   const rangeLabel = dayFromDateTime(filters.from) === dayFromDateTime(filters.to) ? formatDay(filters.from) : formatDay(filters.from) + " – " + formatDay(filters.to);
   const total = useMemo(() => data?.rollups.reduce((sum, item) => sum + item.usageMilliseconds, 0) ?? 0, [data]);
@@ -109,7 +110,9 @@ function App() {
           setFilters((current) => ({ ...current, ...threeDayRange(options.availableDates[options.availableDates.length - 1]) }));
         }
       })
-      .catch(() => { if (!cancelled) setFilterOptions((current) => filters.deviceId ? { ...current, apps: [] } : current); })
+      // Keep the last good lists on failure (e.g. a 429 while switching quickly); emptying
+      // them would make the effect below clear the selected app.
+      .catch(() => undefined)
       .finally(() => { if (!cancelled) setOptionsLoading(false); });
     return () => { cancelled = true; };
   }, [filters.deviceId, filters.app]);
@@ -129,15 +132,27 @@ function App() {
     event?.preventDefault();
     // The inputs' `required` only sees typed text, not a chosen option; never query with nothing selected.
     if (!filters.deviceId || !filters.app) { setData(null); setError("Choose a device and an app from the list."); return; }
+    // Only the latest selection may update the page; cancel whatever it supersedes.
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
     setRefreshStatus("loading"); setError(null);
     try {
-      setData(await loadDashboard(filters));
+      const next = await loadDashboard(filters, controller.signal);
+      if (controller.signal.aborted) return;
+      setData(next);
       setRefreshStatus("done");
     } catch (reason) {
-      setData(null); setError(reason instanceof Error ? reason.message : "Unable to load metrics.");
+      if (controller.signal.aborted) return;
+      if (reason instanceof DashboardApiError && reason.status === 429) {
+        // Keep showing the previous report rather than wiping the page.
+        setError("Too many requests. Wait a few seconds, then refresh.");
+      } else {
+        setData(null); setError(reason instanceof Error ? reason.message : "Unable to load metrics.");
+      }
       setRefreshStatus("error");
     } finally {
-      window.setTimeout(() => setRefreshStatus("idle"), 1400);
+      if (loadController.current === controller) window.setTimeout(() => setRefreshStatus("idle"), 1400);
     }
   }
 
