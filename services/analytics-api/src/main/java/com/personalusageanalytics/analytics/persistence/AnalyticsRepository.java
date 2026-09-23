@@ -14,6 +14,7 @@ import com.personalusageanalytics.analytics.model.UsageRollup;
 import com.personalusageanalytics.analytics.model.AnomalyCount;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 // Converts SQL rows into java objects
@@ -36,6 +37,27 @@ public class AnalyticsRepository {
             WHERE device_id = ?
               AND app = ?
             ORDER BY opened_at DESC
+            LIMIT 1
+            """;
+    private static final String FIND_LONGEST_SESSION = """
+            SELECT
+                session_id,
+                device_id,
+                app,
+                source,
+                opened_at,
+                closed_at,
+                duration_milliseconds,
+                status,
+                duplicate_open_count,
+                finalized_at
+            FROM app_usage_sessions
+            WHERE device_id = ?
+              AND app = ?
+              AND status = 'COMPLETED'
+              AND opened_at >= ?
+              AND opened_at < ?
+            ORDER BY duration_milliseconds DESC, opened_at DESC
             LIMIT 1
             """;
     private static final String FIND_USAGE_ROLLUPS = """
@@ -126,27 +148,37 @@ public class AnalyticsRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public Optional<LatestSession> findLatestSession(String deviceId, String app) {
-        return jdbcTemplate.query(
-                FIND_LATEST_SESSION,
-                (resultSet, rowNumber) -> {
-                    Timestamp closedAt = resultSet.getTimestamp("closed_at");
+    private static final RowMapper<LatestSession> SESSION_ROW_MAPPER = (resultSet, rowNumber) -> {
+        Timestamp closedAt = resultSet.getTimestamp("closed_at");
 
-                    return new LatestSession(
-                            resultSet.getObject("session_id", UUID.class),
-                            resultSet.getString("device_id"),
-                            resultSet.getString("app"),
-                            resultSet.getString("source"),
-                            resultSet.getTimestamp("opened_at").toInstant(),
-                            closedAt == null ? null : closedAt.toInstant(),
-                            resultSet.getObject("duration_milliseconds", Long.class),
-                            resultSet.getString("status"),
-                            resultSet.getInt("duplicate_open_count"),
-                            resultSet.getTimestamp("finalized_at").toInstant()
-                    );
-                },
+        return new LatestSession(
+                resultSet.getObject("session_id", UUID.class),
+                resultSet.getString("device_id"),
+                resultSet.getString("app"),
+                resultSet.getString("source"),
+                resultSet.getTimestamp("opened_at").toInstant(),
+                closedAt == null ? null : closedAt.toInstant(),
+                resultSet.getObject("duration_milliseconds", Long.class),
+                resultSet.getString("status"),
+                resultSet.getInt("duplicate_open_count"),
+                resultSet.getTimestamp("finalized_at").toInstant()
+        );
+    };
+
+    public Optional<LatestSession> findLatestSession(String deviceId, String app) {
+        return jdbcTemplate.query(FIND_LATEST_SESSION, SESSION_ROW_MAPPER, deviceId, app)
+                .stream().findFirst();
+    }
+
+    // Longest completed session opened within [from, to).
+    public Optional<LatestSession> findLongestSession(String deviceId, String app, Instant from, Instant to) {
+        return jdbcTemplate.query(
+                FIND_LONGEST_SESSION,
+                SESSION_ROW_MAPPER,
                 deviceId,
-                app
+                app,
+                Timestamp.from(from),
+                Timestamp.from(to)
         ).stream().findFirst();
     }
 

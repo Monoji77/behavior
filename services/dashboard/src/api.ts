@@ -8,7 +8,7 @@ export interface Filters {
   to: string;
 }
 
-export interface LatestSession {
+export interface Session {
   sessionId: string;
   deviceId: string;
   app: string;
@@ -26,16 +26,9 @@ export interface UsageRollup {
   usageMilliseconds: number;
 }
 
-export interface AnomalyCount {
-  anomalyType: string;
-  count: number;
-}
-
 export interface DashboardData {
-  latestSession: LatestSession | null;
+  longestSession: Session | null;
   rollups: UsageRollup[];
-  totalAnomalies: number;
-  anomalies: AnomalyCount[];
 }
 
 export interface FilterOptions {
@@ -58,17 +51,12 @@ export function defaultSelection(deviceId: string, app: string, options: FilterO
   return !app && options.topApp ? { app: options.topApp, done: true } : { done: true };
 }
 
-interface LatestSessionResponse {
-  session: LatestSession;
+interface SessionResponse {
+  session: Session;
 }
 
 interface UsageRollupResponse {
   buckets: UsageRollup[];
-}
-
-interface AnomalySummaryResponse {
-  totalAnomalies: number;
-  counts: AnomalyCount[];
 }
 
 export class DashboardApiError extends Error {
@@ -77,6 +65,8 @@ export class DashboardApiError extends Error {
     this.name = "DashboardApiError";
   }
 }
+
+const WEEK_MILLISECONDS = 7 * 24 * 60 * 60 * 1000;
 
 export function metricUrl(metricName: string, filters: Filters): string {
   const search = new URLSearchParams({
@@ -88,10 +78,20 @@ export function metricUrl(metricName: string, filters: Filters): string {
   if (metricName === "usage-rollup") {
     search.set("granularity", filters.granularity);
   }
-  if (metricName !== "latest-session") {
-    search.set("from", new Date(filters.from).toISOString());
-    search.set("to", new Date(filters.to).toISOString());
-  }
+  search.set("from", new Date(filters.from).toISOString());
+  search.set("to", new Date(filters.to).toISOString());
+  return `/api/v1/metrics?${search.toString()}`;
+}
+
+// Always the 7 days up to now, independent of the chart's selected range.
+export function longestSessionUrl(filters: Pick<Filters, "deviceId" | "app">, now = new Date()): string {
+  const search = new URLSearchParams({
+    metricName: "longest-session",
+    deviceId: filters.deviceId,
+    app: filters.app,
+    from: new Date(now.getTime() - WEEK_MILLISECONDS).toISOString(),
+    to: now.toISOString()
+  });
   return `/api/v1/metrics?${search.toString()}`;
 }
 
@@ -120,7 +120,7 @@ export function loadFilterOptions(deviceId?: string, app?: string): Promise<Filt
 }
 
 export async function loadDashboard(filters: Filters): Promise<DashboardData> {
-  const latest = getJson<LatestSessionResponse>(metricUrl("latest-session", filters))
+  const longest = getJson<SessionResponse>(longestSessionUrl(filters))
     .then((response) => response.session)
     .catch((error: unknown) => {
       if (error instanceof DashboardApiError && error.status === 404) {
@@ -129,18 +129,11 @@ export async function loadDashboard(filters: Filters): Promise<DashboardData> {
       throw error;
     });
   const rollups = getJson<UsageRollupResponse>(metricUrl("usage-rollup", filters));
-  const anomalies = getJson<AnomalySummaryResponse>(metricUrl("anomaly-summary", filters));
 
-  const [latestSession, rollupResponse, anomalyResponse] = await Promise.all([
-    latest,
-    rollups,
-    anomalies
-  ]);
+  const [longestSession, rollupResponse] = await Promise.all([longest, rollups]);
 
   return {
-    latestSession,
-    rollups: rollupResponse.buckets,
-    totalAnomalies: anomalyResponse.totalAnomalies,
-    anomalies: anomalyResponse.counts
+    longestSession,
+    rollups: rollupResponse.buckets
   };
 }

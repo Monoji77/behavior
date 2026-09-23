@@ -63,6 +63,58 @@ class MetricsControllerTest {
         }
 
         @Test
+        void returnsTheLongestSessionInTheRange() throws Exception {
+                Instant from = Instant.parse("2026-09-16T10:00:00Z");
+                Instant to = Instant.parse("2026-09-23T10:00:00Z");
+                when(analyticsRepository.findLongestSession("iPhone 16 Pro", "Google Maps", from, to))
+                                .thenReturn(Optional.of(new LatestSession(
+                                                UUID.fromString("22222222-2222-2222-2222-222222222222"),
+                                                "iPhone 16 Pro",
+                                                "Google Maps",
+                                                "iPhone Shortcut",
+                                                Instant.parse("2026-09-20T09:00:00Z"),
+                                                Instant.parse("2026-09-20T10:30:00Z"),
+                                                5_400_000L,
+                                                "COMPLETED",
+                                                0,
+                                                Instant.parse("2026-09-20T10:30:01Z"))));
+
+                mockMvc.perform(get("/api/v1/metrics")
+                                .param("metricName", "longest-session")
+                                .param("deviceId", "iPhone 16 Pro")
+                                .param("app", "Google Maps")
+                                .param("from", from.toString())
+                                .param("to", to.toString()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.metricName").value("longest-session"))
+                                .andExpect(jsonPath("$.session.durationMilliseconds").value(5_400_000))
+                                .andExpect(jsonPath("$.session.openedAt").value("2026-09-20T09:00:00Z"))
+                                .andExpect(jsonPath("$.session.closedAt").value("2026-09-20T10:30:00Z"));
+        }
+
+        @Test
+        void longestSessionRequiresARangeAndReturnsNotFoundWhenEmpty() throws Exception {
+                mockMvc.perform(get("/api/v1/metrics")
+                                .param("metricName", "longest-session")
+                                .param("deviceId", "iPhone 16 Pro")
+                                .param("app", "Google Maps"))
+                                .andExpect(status().isBadRequest());
+
+                when(analyticsRepository.findLongestSession(
+                                "iPhone 16 Pro", "Google Maps",
+                                Instant.parse("2026-09-16T10:00:00Z"), Instant.parse("2026-09-23T10:00:00Z")))
+                                .thenReturn(Optional.empty());
+
+                mockMvc.perform(get("/api/v1/metrics")
+                                .param("metricName", "longest-session")
+                                .param("deviceId", "iPhone 16 Pro")
+                                .param("app", "Google Maps")
+                                .param("from", "2026-09-16T10:00:00Z")
+                                .param("to", "2026-09-23T10:00:00Z"))
+                                .andExpect(status().isNotFound());
+        }
+
+        @Test
         void returnsNotFoundWhenNoSessionMatches() throws Exception {
                 when(analyticsRepository.findLatestSession("unknown-device", "instagram"))
                                 .thenReturn(Optional.empty());

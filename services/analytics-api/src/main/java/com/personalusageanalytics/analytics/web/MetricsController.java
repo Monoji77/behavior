@@ -46,6 +46,7 @@ public class MetricsController {
     ) {
         return switch (metricName) {
             case "latest-session" -> latestSession(metricName, deviceId, app);
+            case "longest-session" -> longestSession(metricName, deviceId, app, from, to);
             case "usage-rollup" -> usageRollups(
                     metricName, deviceId, app, granularity, from, to
             );
@@ -53,8 +54,8 @@ public class MetricsController {
                     metricName, deviceId, app, from, to
             );
             default -> throw badRequest(
-                    "metricName must be latest-session, usage-rollup, "
-                            + "or anomaly-summary."
+                    "metricName must be latest-session, longest-session, "
+                            + "usage-rollup, or anomaly-summary."
             );
         };
     }
@@ -85,7 +86,25 @@ public class MetricsController {
         );
     }
 
-    private LatestSessionResponse latestSession(
+    private SessionResponse longestSession(
+            String metricName,
+            String deviceId,
+            String app,
+            Instant from,
+            Instant to
+    ) {
+        validateTimeRange(from, to, "longest-session");
+
+        LatestSession session = analyticsRepository.findLongestSession(deviceId, app, from, to)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "No completed session found for the supplied deviceId, app and range."
+                ));
+
+        return new SessionResponse(metricName, session);
+    }
+
+    private SessionResponse latestSession(
             String metricName,
             String deviceId,
             String app
@@ -96,7 +115,7 @@ public class MetricsController {
                         "No session found for the supplied deviceId and app."
                 ));
 
-        return new LatestSessionResponse(metricName, session);
+        return new SessionResponse(metricName, session);
     }
 
     private UsageRollupResponse usageRollups(
@@ -174,7 +193,7 @@ public class MetricsController {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, detail);
     }
 
-    public record LatestSessionResponse(
+    public record SessionResponse(
             String metricName,
             LatestSession session
     ) {

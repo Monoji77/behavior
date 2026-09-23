@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultSelection, filterOptionsUrl, metricUrl, type FilterOptions, type Filters } from "./api";
+import { defaultSelection, filterOptionsUrl, longestSessionUrl, metricUrl, type FilterOptions, type Filters } from "./api";
 
 const filters: Filters = {
   deviceId: "phone-1",
@@ -10,10 +10,13 @@ const filters: Filters = {
 };
 
 describe("metricUrl", () => {
-  it("builds the latest-session request without a time range", () => {
-    expect(metricUrl("latest-session", filters)).toBe(
-      "/api/v1/metrics?metricName=latest-session&deviceId=phone-1&app=instagram"
-    );
+  it("builds the longest-session request for the 7 days up to now", () => {
+    const url = new URL(longestSessionUrl(filters, new Date("2026-09-23T10:00:00Z")), "http://dashboard.test");
+    expect(url.searchParams.get("metricName")).toBe("longest-session");
+    expect(url.searchParams.get("deviceId")).toBe("phone-1");
+    expect(url.searchParams.get("app")).toBe("instagram");
+    expect(url.searchParams.get("from")).toBe("2026-09-16T10:00:00.000Z");
+    expect(url.searchParams.get("to")).toBe("2026-09-23T10:00:00.000Z");
   });
 
   it("builds the rollup request with the required filters", () => {
