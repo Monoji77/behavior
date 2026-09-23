@@ -319,8 +319,8 @@ class MetricsControllerTest {
                                 .thenReturn(List.of("instagram", "maps"));
                 when(analyticsRepository.findEarliestBucketStart("iphone-12", null))
                                 .thenReturn(Optional.of(Instant.parse("2026-08-01T00:00:00Z")));
-                when(analyticsRepository.findTopAppOnLatestDay("iphone-12"))
-                                .thenReturn(Optional.of("maps"));
+                when(analyticsRepository.findTopApps(eq("iphone-12"), any(), any(), eq(1)))
+                                .thenReturn(List.of(new TopApp("maps", 9_000_000L, null)));
                 when(analyticsRepository.findAppIcons())
                                 .thenReturn(Map.of("maps", "https://example.test/maps.png"));
 
@@ -334,6 +334,31 @@ class MetricsControllerTest {
                                 .andExpect(jsonPath("$.earliestUsageAt").value("2026-08-01T00:00:00Z"))
                                 .andExpect(jsonPath("$.topApp").value("maps"))
                                 .andExpect(jsonPath("$.appIcons.maps").value("https://example.test/maps.png"));
+        }
+
+        @Test
+        void defaultsToThePastWeeksTopAppNotTodays() throws Exception {
+                when(analyticsRepository.findDeviceIds()).thenReturn(List.of("iPhone 16 Pro"));
+                when(analyticsRepository.findApps("iPhone 16 Pro")).thenReturn(List.of("Calendar", "Telegram"));
+                when(analyticsRepository.findTopApps(eq("iPhone 16 Pro"), any(), any(), eq(1)))
+                                .thenReturn(List.of(new TopApp("Telegram", 26_040_000L, null)));
+                when(analyticsRepository.findTopAppOnLatestDay("iPhone 16 Pro")).thenReturn(Optional.of("Calendar"));
+
+                mockMvc.perform(get("/api/v1/metrics/filter-options").param("deviceId", "iPhone 16 Pro"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.topApp").value("Telegram"));
+        }
+
+        @Test
+        void fallsBackToTheMostRecentDayWhenNothingWasUsedThisWeek() throws Exception {
+                when(analyticsRepository.findDeviceIds()).thenReturn(List.of("iPhone 16 Pro"));
+                when(analyticsRepository.findApps("iPhone 16 Pro")).thenReturn(List.of("Calendar"));
+                when(analyticsRepository.findTopApps(eq("iPhone 16 Pro"), any(), any(), eq(1))).thenReturn(List.of());
+                when(analyticsRepository.findTopAppOnLatestDay("iPhone 16 Pro")).thenReturn(Optional.of("Calendar"));
+
+                mockMvc.perform(get("/api/v1/metrics/filter-options").param("deviceId", "iPhone 16 Pro"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.topApp").value("Calendar"));
         }
 
         @Test

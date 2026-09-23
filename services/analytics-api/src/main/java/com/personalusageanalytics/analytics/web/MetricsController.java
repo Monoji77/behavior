@@ -78,9 +78,7 @@ public class MetricsController {
                 ? List.of()
                 : analyticsRepository.findAvailableDates(deviceId, app);
 
-        String topApp = (deviceId == null || deviceId.isBlank())
-                ? null
-                : analyticsRepository.findTopAppOnLatestDay(deviceId).orElse(null);
+        String topApp = (deviceId == null || deviceId.isBlank()) ? null : defaultApp(deviceId);
 
         return new FilterOptionsResponse(
                 analyticsRepository.findDeviceIds(),
@@ -125,6 +123,18 @@ public class MetricsController {
                 analyticsRepository.findLongestSession(deviceId, app, weekFrom, weekTo).orElse(null),
                 analyticsRepository.findTopApps(deviceId, weekFrom, weekTo, 3)
         );
+    }
+
+    // The dashboard's default app: the past 7 days' most-used app, the same one
+    // the report card labels "Top used app". Falls back to the most recent day
+    // with any usage when there is none this week.
+    private String defaultApp(String deviceId) {
+        Instant now = Instant.now();
+        return analyticsRepository.findTopApps(deviceId, now.minus(Duration.ofDays(7)), now, 1).stream()
+                .findFirst()
+                .map(TopApp::app)
+                .or(() -> analyticsRepository.findTopAppOnLatestDay(deviceId))
+                .orElse(null);
     }
 
     @GetMapping("/top-apps")
@@ -285,8 +295,8 @@ public class MetricsController {
             List<String> apps,
             Instant earliestUsageAt,
             List<LocalDate> availableDates,
-            // App with the most usage today (or on the most recent day with
-            // usage) for the selected device; the dashboard's default app.
+            // Default app for the selected device: most used over the past 7
+            // days (else on the most recent day with usage).
             String topApp,
             // App Store icon URL per app, where one was found.
             Map<String, String> appIcons
