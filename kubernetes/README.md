@@ -72,6 +72,18 @@ TimescaleDB only reads `POSTGRES_PASSWORD` when it first creates its data
 volume. To change it later, update the Secret and run `ALTER USER` in the
 staging database, or delete staging's `data-timescaledb-0` PVC to start over.
 
+To reach staging's database from your tailnet (e.g. a DB client), first add
+`"tag:behavior-db-staging": ["tag:k3s-operator"]` under `tagOwners` in the
+tailnet policy and allow your devices to reach it (as for `tag:behavior-db`),
+then:
+
+```sh
+kubectl apply -f kubernetes/tailscale-db-staging-service.yaml
+```
+
+Connect to `behavior-db-staging.<tailnet>.ts.net:5432`, database
+`usage_analytics`, user `usage_app`, with the staging Postgres password.
+
 To read the staging collector token: `kubectl -n behavior-staging get secret
 behavior-secrets -o jsonpath='{.data.INGESTION_COLLECTOR_TOKEN}' | base64 -d`.
 Send test events to `http://<node>:18090/api/v1/events` as in

@@ -1,0 +1,27 @@
+# Manually managed, like tailscale-db-service.yaml -- not synced by Argo CD
+# (kept out of the kustomizations so Argo CD never creates or prunes it).
+# Exposes staging's TimescaleDB on the tailnet with its own MagicDNS name
+# (behavior-db-staging.<your-tailnet>.ts.net) via the Tailscale Kubernetes
+# operator. loadBalancerClass: tailscale means k3s's built-in load balancer
+# ignores it, so it doesn't bind 5432 on the node or clash with production's.
+#
+# tag:behavior-db-staging must be defined with owner tag:k3s-operator in the
+# tailnet's ACL policy (Access controls -> Definitions -> Tags) before the
+# operator can assign it to the device this Service provisions.
+apiVersion: v1
+kind: Service
+metadata:
+  name: timescaledb-tailscale
+  namespace: behavior-staging
+  annotations:
+    tailscale.com/hostname: behavior-db-staging
+    tailscale.com/tags: tag:behavior-db-staging
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  selector:
+    app: timescaledb
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: postgresql
