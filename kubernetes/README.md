@@ -61,13 +61,21 @@ points at exactly one of them:
 | `https://chris.taildcd567.ts.net/` | staging | `dashboard.behavior-staging`, node port 8092 | tailnet only |
 
 The staging URL is the k3s node's own Tailscale name, so it is configured on
-the node with `tailscale serve`, not in Kubernetes. Run on the node once staging
-is deployed (`curl -f http://localhost:8092/healthz` returns `ok`):
+the node with `tailscale serve`, not in Kubernetes. Tailscale runs inside WSL
+(not on the Windows host), and the same node also serves other routes (Argo CD on
+`:8445`), so replace only the 443 handler. Once staging is deployed
+(`curl -f http://127.0.0.1:8092/healthz` returns `ok`), from Windows:
 
-```sh
-sudo tailscale serve --bg 8092   # https://chris.<tailnet>.ts.net/ -> staging dashboard
-tailscale serve status           # must show 8092; never 8082 (production)
+```powershell
+wsl.exe -d Ubuntu -u root -- tailscale serve status   # 443 currently -> 127.0.0.1:8082?
+wsl.exe -d Ubuntu -u root -- tailscale serve --bg --https=443 http://127.0.0.1:8092
+wsl.exe -d Ubuntu -u root -- tailscale serve status   # 443 -> :8092; :8445 unchanged
 ```
+
+Never run `tailscale serve reset`, which removes every route. To roll back, rerun
+the second command with `8082`. Verify from another tailnet device: a curl from
+the node to its own tailnet hostname returns a Tailscale 404 even when the route
+is correct.
 
 Never enable Funnel on the node (`tailscale funnel`); staging stays private.
 
