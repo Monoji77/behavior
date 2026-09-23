@@ -1,6 +1,9 @@
-import { type FormEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, CartesianGrid, type TooltipContentProps, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppIcon } from "./AppIcon";
+import { FilterMenu } from "./FilterMenu";
 import { type DashboardData, type Filters, type Granularity, type FilterOptions, defaultSelection, loadDashboard, loadFilterOptions } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
@@ -28,27 +31,9 @@ const formatDay = (value: string) => new Intl.DateTimeFormat(undefined, { month:
 
 function SunIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.7" /><path d="M12 2v2.1M12 19.9V22M4.93 4.93l1.49 1.49M17.58 17.58l1.49 1.49M2 12h2.1M19.9 12H22M4.93 19.07l1.49-1.49M17.58 6.42l1.49-1.49" /></svg>; }
 function MoonIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.7 15.1A8.6 8.6 0 0 1 8.9 3.3 8.7 8.7 0 1 0 20.7 15.1Z" /></svg>; }
-function Chevron() { return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>; }
 
 function Metric({ id, label, value, detail, icon, tone = "violet", children }: { id?: string; label: string; value: string | number; detail?: string; icon: string; tone?: string; children?: ReactNode }) {
   return <article id={id} className="metric"><span className={"metric-icon " + tone}>{icon}</span><p>{label}</p><strong>{value}</strong>{detail && <small>{detail}</small>}{children}</article>;
-}
-
-function Combobox({ label, value, onChange, options, placeholder, loading }: { label: string; value: string; onChange: (value: string) => void; options: string[]; placeholder: string; loading: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState(value);
-  const [filtering, setFiltering] = useState(false);
-  const closeTimer = useRef<number | undefined>(undefined);
-  const listId = useId();
-  useEffect(() => setQuery(value), [value]);
-  useEffect(() => () => { if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current); }, []);
-  const matches = filtering ? options.filter((item) => item.toLocaleLowerCase().includes(query.toLocaleLowerCase())) : options;
-  const cancelClose = () => { if (closeTimer.current !== undefined) { window.clearTimeout(closeTimer.current); closeTimer.current = undefined; } };
-  const close = () => { cancelClose(); closeTimer.current = window.setTimeout(() => { setOpen(false); setQuery(value); setFiltering(false); closeTimer.current = undefined; }, 120); };
-  const select = (item: string) => { cancelClose(); onChange(item); setQuery(item); setOpen(false); setFiltering(false); };
-  return <label className="filter-pill combo-pill"><span>{label}</span><div className="combo-wrap"><input required role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} value={query} onFocus={() => { cancelClose(); setOpen(true); setFiltering(false); }} onBlur={close} onChange={(event) => { setQuery(event.target.value); setOpen(true); setFiltering(true); }} onKeyDown={(event) => { if (event.key === "Enter" && filtering && matches.length) { event.preventDefault(); select(matches[0]); } }} placeholder={placeholder} /> <Chevron />
-    {open && <ul id={listId} role="listbox" className="option-list">{loading ? <li className="no-match">Loading available {label.toLocaleLowerCase()}s…</li> : matches.length ? matches.map((item) => <li key={item} role="option" aria-selected={item === value} onPointerDown={(event) => event.preventDefault()} onClick={() => select(item)}>{item}</li>) : <li className="no-match">No matching {label.toLocaleLowerCase()} found</li>}</ul>}
-  </div></label>;
 }
 
 const axisLabel = (value: string, granularity: Granularity) => {
@@ -56,6 +41,8 @@ const axisLabel = (value: string, granularity: Granularity) => {
   if (granularity === "DAY") return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric" }).format(date);
 };
+
+const RANKS = ["Top used app", "Second most used app", "Third most used app"];
 
 const trendConfig: ChartConfig = { usage: { label: "Usage time", color: "var(--accent-bright)" } };
 
@@ -93,7 +80,7 @@ function App() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [], topApp: null });
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [], topApp: null, appIcons: {} });
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
@@ -152,22 +139,26 @@ function App() {
     }
   }
 
-  return <div className="shell">
+  return <TooltipProvider delay={150}><div className="shell">
     <aside className="sidebar"><a className="brand" href="#top"><b>U</b> Usage<span>OS</span></a><nav aria-label="Dashboard navigation"><a className="selected" href="#overview">▦ Overview</a><a href="#activity">⌁ Activity</a><a href="#session">◷ Sessions</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
     <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>Usage overview</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button><b>CY</b></div></header>
       <section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
-        <Combobox label="Device" value={filters.deviceId} onChange={(value) => update("deviceId", value)} options={filterOptions.deviceIds} loading={optionsLoading} placeholder="Search available devices" />
-        <Combobox label="App" value={filters.app} onChange={(value) => update("app", value)} options={filterOptions.apps} loading={optionsLoading} placeholder="Search available apps" />
+        <FilterMenu loading={optionsLoading} fields={[
+          { item: "Device", value: filters.deviceId, placeholder: "Choose a device", tooltip: "Select a device", options: filterOptions.deviceIds, onChange: (value) => update("deviceId", value) },
+          { item: "App", value: filters.app, placeholder: "Choose an app", tooltip: "Select an app", options: filterOptions.apps, icons: filterOptions.appIcons, onChange: (value) => update("app", value) }
+        ]} />
         <RefreshButton status={refreshStatus} />
       </form></section>
       {error && <p className="error" role="alert">{error}</p>}
       <section id="overview" className="overview-row" aria-label="Usage summary">
-        <article className="panel report report-card"><div><p className="eyebrow">Current report</p><h2>{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p></div><div><span>Range</span><strong>{dayFromDateTime(filters.from) === dayFromDateTime(filters.to) ? formatDay(filters.from) : formatDay(filters.from) + " – " + formatDay(filters.to)}</strong></div></article>
+        <article className="panel report report-card"><div className="report-head"><p className="eyebrow">Current report</p><h2>{filters.app && <AppIcon app={filters.app} url={filterOptions.appIcons[filters.app]} size={30} />}{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p></div>
+          <ol className="top-apps" aria-label="Most used apps in the past week">{RANKS.map((rank, index) => { const entry = data?.topApps[index]; return <li key={rank} className={"rank rank-" + (index + 1)}><span className="rank-badge">{index + 1}</span><span className="rank-text"><small>{rank}</small><strong>{entry ? <>{<AppIcon app={entry.app} url={entry.iconUrl} size={18} />}{entry.app}</> : "—"}</strong></span><em>{entry ? duration(entry.usageMilliseconds) : ""}</em></li>; })}</ol>
+          <div className="report-range"><span>Range</span><strong>{dayFromDateTime(filters.from) === dayFromDateTime(filters.to) ? formatDay(filters.from) : formatDay(filters.from) + " – " + formatDay(filters.to)}</strong></div></article>
         <div className="metrics"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric id="session" label="Longest session (past week)" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
       </section>
       <section id="activity" className="activity"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
 </section>
 
-    </main></div>;
+    </main></div></TooltipProvider>;
 }
 export default App;

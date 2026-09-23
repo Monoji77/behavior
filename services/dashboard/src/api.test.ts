@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultSelection, filterOptionsUrl, longestSessionUrl, metricUrl, type FilterOptions, type Filters } from "./api";
+import { defaultSelection, filterOptionsUrl, longestSessionUrl, metricUrl, topAppsUrl, type FilterOptions, type Filters } from "./api";
 
 const filters: Filters = {
   deviceId: "phone-1",
@@ -10,6 +10,15 @@ const filters: Filters = {
 };
 
 describe("metricUrl", () => {
+  it("builds the top-apps request for the device over the 7 days up to now", () => {
+    const url = new URL(topAppsUrl("iPhone 16 Pro", new Date("2026-09-23T10:00:00Z")), "http://dashboard.test");
+    expect(url.pathname).toBe("/api/v1/metrics/top-apps");
+    expect(url.searchParams.get("deviceId")).toBe("iPhone 16 Pro");
+    expect(url.searchParams.get("from")).toBe("2026-09-16T10:00:00.000Z");
+    expect(url.searchParams.get("to")).toBe("2026-09-23T10:00:00.000Z");
+    expect(url.searchParams.get("limit")).toBe("3");
+  });
+
   it("builds the longest-session request for the 7 days up to now", () => {
     const url = new URL(longestSessionUrl(filters, new Date("2026-09-23T10:00:00Z")), "http://dashboard.test");
     expect(url.searchParams.get("metricName")).toBe("longest-session");
@@ -35,7 +44,7 @@ describe("metricUrl", () => {
 
 describe("defaultSelection", () => {
   const options = (overrides: Partial<FilterOptions>): FilterOptions => ({
-    deviceIds: ["iPhone 16 Pro"], apps: ["Calendar", "Spotify"], earliestUsageAt: null, availableDates: [], topApp: "Calendar", ...overrides
+    deviceIds: ["iPhone 16 Pro"], apps: ["Calendar", "Spotify"], earliestUsageAt: null, availableDates: [], topApp: "Calendar", appIcons: {}, ...overrides
   });
 
   it("picks the first device when none is selected", () => {

@@ -4,6 +4,8 @@ import java.sql.Timestamp;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -12,6 +14,7 @@ import com.personalusageanalytics.analytics.model.LatestSession;
 import com.personalusageanalytics.analytics.model.RollupGranularity;
 import com.personalusageanalytics.analytics.model.UsageRollup;
 import com.personalusageanalytics.analytics.model.AnomalyCount;
+import com.personalusageanalytics.analytics.model.TopApp;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -142,6 +145,25 @@ public class AnalyticsRepository {
             ORDER BY bucket_start DESC, SUM(usage_milliseconds) DESC, app ASC
             LIMIT 1
             """;
+    private static final String FIND_APP_ICONS = """
+            SELECT app, icon_url
+            FROM app_icons
+            WHERE icon_url IS NOT NULL
+            """;
+    // Hourly buckets (one timezone) give an exact [from, to) window.
+    private static final String FIND_TOP_APPS = """
+            SELECT r.app, SUM(r.usage_milliseconds) AS usage_milliseconds, i.icon_url
+            FROM app_usage_rollups r
+            LEFT JOIN app_icons i ON i.app = r.app
+            WHERE r.device_id = ?
+              AND r.granularity = 'HOUR'
+              AND r.bucket_start >= ?
+              AND r.bucket_start < ?
+            GROUP BY r.app, i.icon_url
+            HAVING SUM(r.usage_milliseconds) > 0
+            ORDER BY usage_milliseconds DESC, r.app ASC
+            LIMIT ?
+            """;
     private final JdbcTemplate jdbcTemplate;
 
     public AnalyticsRepository(JdbcTemplate jdbcTemplate) {
@@ -239,6 +261,29 @@ public class AnalyticsRepository {
         }
 
         return jdbcTemplate.queryForList(FIND_APPS_FOR_DEVICE, String.class, deviceId);
+    }
+
+    public Map<String, String> findAppIcons() {
+        Map<String, String> icons = new TreeMap<>();
+        jdbcTemplate.query(FIND_APP_ICONS, resultSet -> {
+            icons.put(resultSet.getString("app"), resultSet.getString("icon_url"));
+        });
+        return icons;
+    }
+
+    public List<TopApp> findTopApps(String deviceId, Instant from, Instant to, int limit) {
+        return jdbcTemplate.query(
+                FIND_TOP_APPS,
+                (resultSet, rowNumber) -> new TopApp(
+                        resultSet.getString("app"),
+                        resultSet.getLong("usage_milliseconds"),
+                        resultSet.getString("icon_url")
+                ),
+                deviceId,
+                Timestamp.from(from),
+                Timestamp.from(to),
+                limit
+        );
     }
 
     public Optional<String> findTopAppOnLatestDay(String deviceId) {
