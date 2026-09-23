@@ -164,6 +164,15 @@ public class AnalyticsRepository {
             ORDER BY usage_milliseconds DESC, r.app ASC
             LIMIT ?
             """;
+    private static final String FIND_USAGE_TOTAL = """
+            SELECT COALESCE(SUM(usage_milliseconds), 0)
+            FROM app_usage_rollups
+            WHERE device_id = ?
+              AND app = ?
+              AND granularity = 'HOUR'
+              AND bucket_start >= ?
+              AND bucket_start < ?
+            """;
     private final JdbcTemplate jdbcTemplate;
 
     public AnalyticsRepository(JdbcTemplate jdbcTemplate) {
@@ -261,6 +270,13 @@ public class AnalyticsRepository {
         }
 
         return jdbcTemplate.queryForList(FIND_APPS_FOR_DEVICE, String.class, deviceId);
+    }
+
+    // Total usage of one app in [from, to), from the hourly rollups.
+    public long findUsageTotal(String deviceId, String app, Instant from, Instant to) {
+        Long total = jdbcTemplate.queryForObject(
+                FIND_USAGE_TOTAL, Long.class, deviceId, app, Timestamp.from(from), Timestamp.from(to));
+        return total == null ? 0 : total;
     }
 
     public Map<String, String> findAppIcons() {

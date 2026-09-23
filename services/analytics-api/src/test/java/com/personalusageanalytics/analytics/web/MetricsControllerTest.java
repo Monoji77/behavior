@@ -1,6 +1,8 @@
 package com.personalusageanalytics.analytics.web;
 
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -153,6 +155,50 @@ class MetricsControllerTest {
         }
 
         @Test
+        void returnsTheWholeDashboardForOneSelectionInOneResponse() throws Exception {
+                Instant from = Instant.parse("2026-09-21T16:00:00Z");
+                Instant to = Instant.parse("2026-09-23T15:59:00Z");
+                when(analyticsRepository.findUsageRollups("iPhone 16 Pro", "Telegram", RollupGranularity.HOUR, from, to))
+                                .thenReturn(List.of(new UsageRollup("iPhone 16 Pro", "Telegram", RollupGranularity.HOUR, "UTC", Instant.parse("2026-09-22T01:00:00Z"), 600_000L, Instant.parse("2026-09-22T02:00:00Z"))));
+                when(analyticsRepository.findUsageTotal(eq("iPhone 16 Pro"), eq("Telegram"), any(), any()))
+                                .thenReturn(26_040_000L);
+                when(analyticsRepository.findLongestSession(eq("iPhone 16 Pro"), eq("Telegram"), any(), any()))
+                                .thenReturn(Optional.empty());
+                when(analyticsRepository.findTopApps(eq("iPhone 16 Pro"), any(), any(), eq(3)))
+                                .thenReturn(List.of(new TopApp("Telegram", 26_040_000L, null)));
+
+                mockMvc.perform(get("/api/v1/metrics/dashboard")
+                                .param("deviceId", "iPhone 16 Pro")
+                                .param("app", "Telegram")
+                                .param("granularity", "HOUR")
+                                .param("from", from.toString())
+                                .param("to", to.toString()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.buckets.length()").value(1))
+                                .andExpect(jsonPath("$.pastWeekMilliseconds").value(26_040_000))
+                                .andExpect(jsonPath("$.longestSession").value(nullValue()))
+                                .andExpect(jsonPath("$.topApps[0].app").value("Telegram"));
+        }
+
+        @Test
+        void dashboardValidatesItsParameters() throws Exception {
+                mockMvc.perform(get("/api/v1/metrics/dashboard")
+                                .param("deviceId", "iPhone 16 Pro")
+                                .param("app", "")
+                                .param("granularity", "HOUR")
+                                .param("from", "2026-09-21T16:00:00Z")
+                                .param("to", "2026-09-23T15:59:00Z"))
+                                .andExpect(status().isBadRequest());
+                mockMvc.perform(get("/api/v1/metrics/dashboard")
+                                .param("deviceId", "iPhone 16 Pro")
+                                .param("app", "Telegram")
+                                .param("granularity", "WEEK")
+                                .param("from", "2026-09-21T16:00:00Z")
+                                .param("to", "2026-09-23T15:59:00Z"))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
         void returnsNotFoundWhenNoSessionMatches() throws Exception {
                 when(analyticsRepository.findLatestSession("unknown-device", "instagram"))
                                 .thenReturn(Optional.empty());
@@ -273,8 +319,8 @@ class MetricsControllerTest {
                                 .thenReturn(List.of("instagram", "maps"));
                 when(analyticsRepository.findEarliestBucketStart("iphone-12", null))
                                 .thenReturn(Optional.of(Instant.parse("2026-08-01T00:00:00Z")));
-                when(analyticsRepository.findTopAppOnLatestDay("iphone-12"))
-                                .thenReturn(Optional.of("maps"));
+                when(analyticsRepository.findTopApps(eq("iphone-12"), any(), any(), eq(1)))
+                                .thenReturn(List.of(new TopApp("maps", 9_000_000L, null)));
                 when(analyticsRepository.findAppIcons())
                                 .thenReturn(Map.of("maps", "https://example.test/maps.png"));
 
@@ -288,6 +334,31 @@ class MetricsControllerTest {
                                 .andExpect(jsonPath("$.earliestUsageAt").value("2026-08-01T00:00:00Z"))
                                 .andExpect(jsonPath("$.topApp").value("maps"))
                                 .andExpect(jsonPath("$.appIcons.maps").value("https://example.test/maps.png"));
+        }
+
+        @Test
+        void defaultsToThePastWeeksTopAppNotTodays() throws Exception {
+                when(analyticsRepository.findDeviceIds()).thenReturn(List.of("iPhone 16 Pro"));
+                when(analyticsRepository.findApps("iPhone 16 Pro")).thenReturn(List.of("Calendar", "Telegram"));
+                when(analyticsRepository.findTopApps(eq("iPhone 16 Pro"), any(), any(), eq(1)))
+                                .thenReturn(List.of(new TopApp("Telegram", 26_040_000L, null)));
+                when(analyticsRepository.findTopAppOnLatestDay("iPhone 16 Pro")).thenReturn(Optional.of("Calendar"));
+
+                mockMvc.perform(get("/api/v1/metrics/filter-options").param("deviceId", "iPhone 16 Pro"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.topApp").value("Telegram"));
+        }
+
+        @Test
+        void fallsBackToTheMostRecentDayWhenNothingWasUsedThisWeek() throws Exception {
+                when(analyticsRepository.findDeviceIds()).thenReturn(List.of("iPhone 16 Pro"));
+                when(analyticsRepository.findApps("iPhone 16 Pro")).thenReturn(List.of("Calendar"));
+                when(analyticsRepository.findTopApps(eq("iPhone 16 Pro"), any(), any(), eq(1))).thenReturn(List.of());
+                when(analyticsRepository.findTopAppOnLatestDay("iPhone 16 Pro")).thenReturn(Optional.of("Calendar"));
+
+                mockMvc.perform(get("/api/v1/metrics/filter-options").param("deviceId", "iPhone 16 Pro"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.topApp").value("Calendar"));
         }
 
         @Test
