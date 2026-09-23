@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { dashboardUrl, defaultDateRange, defaultSelection, fillUsageBuckets, filterOptionsUrl, loadDashboard, selectedAppRank, type FilterOptions, type Filters } from "./api";
+import { appsWithTopFirst, dashboardUrl, defaultDateRange, defaultSelection, fillUsageBuckets, filterOptionsUrl, loadDashboard, selectedAppRank, type FilterOptions, type Filters } from "./api";
 
 const filters: Filters = {
   deviceId: "phone-1",
@@ -142,6 +142,20 @@ describe("fillUsageBuckets", () => {
   it("keeps a bucket that doesn't line up with the local grid", () => {
     const odd = { bucketStart: "2026-09-22T00:30:00.000Z", usageMilliseconds: 7 };
     expect(fillUsageBuckets([odd], "2026-09-22T00:00", "2026-09-22T23:59", "HOUR")).toContainEqual(odd);
+  });
+});
+
+describe("appsWithTopFirst", () => {
+  const top = (...apps: string[]) => apps.map((app, index) => ({ app, usageMilliseconds: 10 - index, iconUrl: null }));
+
+  it("lists the week's top apps first, in rank order, then the rest alphabetically", () => {
+    expect(appsWithTopFirst(["Calendar", "Instagram", "Shopee", "Spotify", "Telegram"], top("Telegram", "Spotify", "Shopee")))
+      .toEqual(["Telegram", "Spotify", "Shopee", "Calendar", "Instagram"]);
+  });
+
+  it("keeps alphabetical order before the top apps are loaded and ignores unknown apps", () => {
+    expect(appsWithTopFirst(["Calendar", "Telegram"], undefined)).toEqual(["Calendar", "Telegram"]);
+    expect(appsWithTopFirst(["Calendar", "Telegram"], top("Deleted App", "Telegram"))).toEqual(["Telegram", "Calendar"]);
   });
 });
 
