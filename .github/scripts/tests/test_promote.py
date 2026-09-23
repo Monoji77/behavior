@@ -56,6 +56,7 @@ class PromotionTest(unittest.TestCase):
         return self.command(self.remote, "rev-parse", branch)
 
     def test_promotes_exact_source_and_is_idempotent(self):
+        promotion.promote(self.source, "staging")
         promotion.promote(self.source, "homelab")
         deployed = self.deployment()
         self.assertNotEqual(deployed, self.initial)
@@ -76,6 +77,18 @@ class PromotionTest(unittest.TestCase):
         # A staging promotion must never touch the production branch.
         self.assertEqual(self.deployment(), self.initial)
 
+    def test_refuses_production_until_staging_runs_the_source(self):
+        with self.assertRaisesRegex(RuntimeError, "staging is not running it"):
+            promotion.promote(self.source, "homelab")
+        self.assertEqual(self.deployment(), self.initial)
+
+    def test_refuses_production_when_staging_runs_an_older_source(self):
+        promotion.promote(self.source, "staging")
+        newer = self.advance_main()
+        with self.assertRaisesRegex(RuntimeError, "staging is not running it"):
+            promotion.promote(newer, "homelab")
+        self.assertEqual(self.deployment(), self.initial)
+
     def test_rejects_unknown_environment(self):
         with self.assertRaises(ValueError):
             promotion.promote(self.source, "production")
@@ -86,19 +99,21 @@ class PromotionTest(unittest.TestCase):
         self.assertEqual(self.deployment(), self.initial)
 
     def test_skips_new_source_arriving_during_preparation(self):
+        promotion.promote(self.source, "staging")
         original = promotion.refresh
         calls = 0
-        def refresh(deploy_branch):
+        def refresh(*deploy_branches):
             nonlocal calls
             calls += 1
             if calls == 2:
                 self.advance_main()
-            original(deploy_branch)
+            original(*deploy_branches)
         with patch.object(promotion, "refresh", refresh):
             promotion.promote(self.source, "homelab")
         self.assertEqual(self.deployment(), self.initial)
 
     def conflict(self, newer_source=False):
+        promotion.promote(self.source, "staging")
         original = promotion.git
         collided = False
         competing = None
@@ -130,6 +145,7 @@ class PromotionTest(unittest.TestCase):
             f'    - newTag: initial\n      name: ghcr.io/monoji77/behavior-{s}\n'
             for s in ("ingestion-api", "stream-processor", "analytics-api", "dashboard")))
         source = self.advance_main()
+        promotion.promote(source, "staging")
         promotion.promote(source, "homelab")
         result = self.command(self.remote, "show", "deploy/homelab:gitops/behavior/kustomization.yaml")
         self.assertEqual(result.count(source), 4)

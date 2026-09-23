@@ -5,8 +5,9 @@ name: Promote to production
 # run this workflow manually once you've checked staging.
 #
 # promote.py only ever promotes the current tip of main (it aborts as
-# "superseded" if main has moved on since the run started), so this always
-# ships exactly what staging is currently running -- there's no way to
+# "superseded" if main has moved on since the run started), and refuses
+# unless deploy/staging already runs that exact commit -- so this always
+# ships exactly what staging is currently running. There's no way to
 # cherry-pick an older commit, by design.
 on:
   workflow_dispatch: {}
