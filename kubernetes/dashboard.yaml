@@ -3,6 +3,10 @@ kind: Deployment
 metadata:
   name: dashboard
   namespace: behavior
+  annotations:
+    # Roll out after analytics-api (wave 0) is healthy, so a new dashboard never
+    # calls an API version that doesn't have its endpoints yet.
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
   selector:

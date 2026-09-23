@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, CartesianGrid, type TooltipContentProps, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { type DashboardData, type Filters, type Granularity, type FilterOptions, defaultSelection, loadDashboard, loadFilterOptions } from "./api";
@@ -20,7 +20,7 @@ const initialRange = range();
 const duration = (milliseconds?: number | null) => {
   if (!milliseconds) return "—";
   const minutes = Math.round(milliseconds / 60_000);
-  return minutes >= 60 ? Math.floor(minutes / 60) + "h " + minutes % 60 + "m" : minutes + "m";
+  return minutes >= 60 ? Math.floor(minutes / 60) + "h " + minutes % 60 + " min" : minutes + " min";
 };
 const time = (value?: string | null) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
 const dayFromDateTime = (value: string) => value.slice(0, 10);
@@ -30,8 +30,8 @@ function SunIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><circle 
 function MoonIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.7 15.1A8.6 8.6 0 0 1 8.9 3.3 8.7 8.7 0 1 0 20.7 15.1Z" /></svg>; }
 function Chevron() { return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>; }
 
-function Metric({ label, value, detail, icon, tone = "violet" }: { label: string; value: string | number; detail: string; icon: string; tone?: string }) {
-  return <article className="metric"><span className={"metric-icon " + tone}>{icon}</span><p>{label}</p><strong>{value}</strong><small>{detail}</small></article>;
+function Metric({ id, label, value, detail, icon, tone = "violet", children }: { id?: string; label: string; value: string | number; detail?: string; icon: string; tone?: string; children?: ReactNode }) {
+  return <article id={id} className="metric"><span className={"metric-icon " + tone}>{icon}</span><p>{label}</p><strong>{value}</strong>{detail && <small>{detail}</small>}{children}</article>;
 }
 
 function Combobox({ label, value, onChange, options, placeholder, loading }: { label: string; value: string; onChange: (value: string) => void; options: string[]; placeholder: string; loading: boolean }) {
@@ -79,7 +79,7 @@ function Trend({ data, granularity }: { data: DashboardData["rollups"]; granular
         </defs>
         <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="4 5" />
         <XAxis dataKey="bucketStart" tickLine={false} axisLine={false} tickMargin={10} minTickGap={40} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: string) => axisLabel(value, granularity)} />
-        <YAxis tickLine={false} axisLine={false} width={40} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: number) => Math.round(value / 60_000) + "m"} />
+        <YAxis tickLine={false} axisLine={false} width={52} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: number) => Math.round(value / 60_000) + " min"} />
         <ChartTooltip cursor={{ stroke: "var(--color-usage)", strokeDasharray: "3 3" }} content={<TrendTooltip granularity={granularity} />} />
         <Area dataKey="usageMilliseconds" type="monotone" fill="url(#trendFill)" stroke="var(--color-usage)" strokeWidth={3} dot={{ r: 3, fill: "var(--panel)", stroke: "var(--color-usage)", strokeWidth: 2 }} activeDot={{ r: 5, fill: "var(--color-usage)", stroke: "var(--panel)", strokeWidth: 2 }} />
       </AreaChart>
@@ -163,12 +163,11 @@ function App() {
       {error && <p className="error" role="alert">{error}</p>}
       <section id="overview" className="overview-row" aria-label="Usage summary">
         <article className="panel report report-card"><div><p className="eyebrow">Current report</p><h2>{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p></div><div><span>Range</span><strong>{dayFromDateTime(filters.from) === dayFromDateTime(filters.to) ? formatDay(filters.from) : formatDay(filters.from) + " – " + formatDay(filters.to)}</strong></div></article>
-        <div className="metrics"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric label="Longest session (past week)" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data ? (data.longestSession ? "Opened " + time(data.longestSession.openedAt) : "No session this week") : "Awaiting activity"} icon="▣" tone="amber" /></div>
+        <div className="metrics"><Metric label="Time tracked" value={data ? duration(total) : "—"} detail={data ? "For selected range" : "Load a report to begin"} icon="◷" /><Metric id="session" label="Longest session (past week)" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
       </section>
-      <section id="activity" className="dashboard-grid"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
-        <article id="session" className="panel session"><header><div><p className="eyebrow">Past week</p><h2>Longest session</h2></div><span className="session-icon">◷</span></header>{data?.longestSession ? <><strong className="session-time">{duration(data.longestSession.durationMilliseconds)}</strong><dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl></> : <Empty title={data ? "No session this week" : "No session loaded"} text={data ? "This app has no completed session in the past 7 days." : "Choose a device and app to see its longest session of the past week."} />}</article></section>
+      <section id="activity" className="activity"><article className="panel trend-panel"><header><div><p className="eyebrow">Usage rollup</p><h2>Time in {filters.app || "your apps"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend data={data.rollups} granularity={filters.granularity} /> : <div className="chart-empty">Your usage trend will appear here after you load a report.</div>}</article>
+</section>
 
     </main></div>;
 }
-function Empty({ title, text }: { title: string; text: string }) { return <div className="empty"><strong>{title}</strong><p>{text}</p></div>; }
 export default App;
