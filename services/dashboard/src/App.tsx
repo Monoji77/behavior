@@ -89,7 +89,7 @@ function Trend({ data, granularity }: { data: DashboardData["rollups"]; granular
 }
 
 function App() {
-  const [filters, setFilters] = useState<Filters>({ deviceId: "iphone-16-pro", app: "instagram", granularity: "HOUR", ...initialRange });
+  const [filters, setFilters] = useState<Filters>({ deviceId: "iPhone 16 Pro", app: "Instagram", granularity: "HOUR", ...initialRange });
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
