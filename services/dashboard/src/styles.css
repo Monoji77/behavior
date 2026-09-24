@@ -162,5 +162,46 @@
 
 @media(prefers-reduced-motion:reduce){
   .glass-nav__link,.glass-nav__icon,.pipeline-node{transition:none}
-  .pipeline-node.is-selected .pipeline-node__orb::before,.pipeline-connector i,.pipeline-dlq__path i{animation:none}
+  .pipeline-node.is-selected .pipeline-node__orb::before,.pipeline-connector i,.pipeline-dlq__path i,.pipeline-node__label{animation:none}
+}
+
+/* Moving highlight inspired by the animated-gradient-text treatment. */
+.pipeline-node__label{
+  background:linear-gradient(90deg,#b8a1ff 0%,#75d9ff 34%,#f2b7ff 67%,#b8a1ff 100%);
+  background-size:300% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  color:transparent;
+  animation:pipeline-label-gradient 5s linear infinite;
+}
+@keyframes pipeline-label-gradient{to{background-position:300% center}}
+
+/* Product identity and ranked app choices. */
+.brand{font-size:1rem;letter-spacing:-.025em;line-height:1.25}
+.menu-option__rank{align-items:center;background:var(--accent-soft);border-radius:999px;color:var(--accent-bright);display:inline-flex;flex:0 0 auto;font-size:.62rem;font-weight:850;justify-content:center;min-width:1.7rem;padding:.22rem .38rem}
+.app-icon--app-store{align-items:center;background:linear-gradient(145deg,#35b7ff,#007aff 62%,#6255dc);display:inline-flex;justify-content:center}
+.app-icon--app-store svg{fill:none;height:72%;stroke:#fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:4.2;width:72%}
+
+/* Pipeline layers use forms that resemble the systems they represent, not cards. */
+.pipeline-node{background:transparent;border:0;border-radius:0;box-shadow:none;min-height:13.5rem;padding:.85rem .3rem}
+.pipeline-node:hover,.pipeline-node:focus-visible,.pipeline-node.is-selected{background:transparent;border-color:transparent;box-shadow:none;transform:translateY(-3px)}
+.pipeline-node:focus-visible{outline:2px solid var(--accent-bright);outline-offset:4px}
+.pipeline-node__visual{align-items:center;background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 42%,var(--line));box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 10px 24px rgba(0,0,0,.16);color:var(--accent-bright);display:inline-flex;justify-content:center;position:relative;transition:background .25s ease,border-color .25s ease,box-shadow .25s ease,transform .25s ease}
+.pipeline-node__visual svg{fill:none;height:70%;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:2.25;width:70%}
+.pipeline-node--phone .pipeline-node__visual{border-radius:.75rem;height:5.2rem;width:3.05rem}
+.pipeline-node--api .pipeline-node__visual{border-radius:1.1rem;height:3.75rem;width:4.6rem}
+.pipeline-node--broker .pipeline-node__visual{border-radius:.7rem;height:3.6rem;width:4.8rem}
+.pipeline-node--processor .pipeline-node__visual{background:transparent;border:0;box-shadow:none;height:4.3rem;width:4.5rem}
+.pipeline-node--database .pipeline-node__visual{border-radius:50%;height:4.25rem;width:4.75rem}
+.pipeline-node--dashboard .pipeline-node__visual{border-radius:.45rem;height:3.6rem;width:4.8rem}
+.pipeline-node--dashboard .pipeline-node__visual::after{background:currentColor;bottom:-.42rem;content:"";height:2px;left:26%;position:absolute;width:48%}
+.pipeline-node.is-selected .pipeline-node__visual{background:var(--accent);border-color:var(--accent-bright);box-shadow:0 0 0 4px var(--accent-soft),0 12px 26px color-mix(in srgb,var(--accent) 28%,transparent);color:#fff;transform:scale(1.06)}
+.pipeline-node.is-selected .pipeline-node__visual::before{animation:pipeline-orbit 1.8s ease-out infinite;border:1px solid color-mix(in srgb,var(--accent-bright) 55%,transparent);border-radius:inherit;content:"";inset:-.3rem;position:absolute}
+.pipeline-node__orb,.pipeline-node__orb::before{display:none}
+
+@media(max-width:820px){
+  .pipeline-node{align-items:center;display:grid;grid-template-columns:auto 1fr;min-height:0;padding:.75rem .35rem;text-align:left}
+  .pipeline-node__visual{grid-row:span 3;margin-right:.75rem}
+  .pipeline-node small{grid-column:2}
 }
