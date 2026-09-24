@@ -15,6 +15,7 @@ import com.personalusageanalytics.analytics.model.RollupGranularity;
 import com.personalusageanalytics.analytics.model.UsageRollup;
 import com.personalusageanalytics.analytics.model.AnomalyCount;
 import com.personalusageanalytics.analytics.model.TopApp;
+import com.personalusageanalytics.analytics.model.AppUsageTotal;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -199,6 +200,17 @@ public class AnalyticsRepository {
               AND bucket_start >= ?
               AND bucket_start < ?
             """;
+    private static final String FIND_APP_USAGE_TOTALS = """
+            SELECT app, SUM(usage_milliseconds) AS usage_milliseconds
+            FROM app_usage_rollups
+            WHERE device_id = ?
+              AND granularity = 'HOUR'
+              AND bucket_start >= ?
+              AND bucket_start < ?
+            GROUP BY app
+            HAVING SUM(usage_milliseconds) > 0
+            ORDER BY usage_milliseconds DESC, app ASC
+            """;
     private final JdbcTemplate jdbcTemplate;
 
     public AnalyticsRepository(JdbcTemplate jdbcTemplate) {
@@ -303,6 +315,13 @@ public class AnalyticsRepository {
         Long total = jdbcTemplate.queryForObject(
                 FIND_USAGE_TOTAL, Long.class, deviceId, app, Timestamp.from(from), Timestamp.from(to));
         return total == null ? 0 : total;
+    }
+
+    public List<AppUsageTotal> findAppUsageTotals(String deviceId, Instant from, Instant to) {
+        return jdbcTemplate.query(FIND_APP_USAGE_TOTALS,
+                (resultSet, rowNumber) -> new AppUsageTotal(
+                        resultSet.getString("app"), resultSet.getLong("usage_milliseconds")),
+                deviceId, Timestamp.from(from), Timestamp.from(to));
     }
 
     public String findAppIcon(String app) {
