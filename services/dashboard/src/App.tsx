@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, CartesianGrid, type TooltipContentProps, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AppIcon } from "./AppIcon";
 import { formatDuration } from "./format";
 import { FilterMenu } from "./FilterMenu";
@@ -209,7 +209,7 @@ function App() {
       {error && <p className="error" role="alert">{error}</p>}
       <section id="overview" className="dashboard-layout" aria-label="Usage summary">
         <article className="panel report report-card"><div className="report-head"><p className="eyebrow">Current report</p><h2>{filters.app && <AppIcon app={filters.app} url={filterOptions.appIcons[filters.app]} size={30} />}{filters.app || "Select an app"}</h2><p>{filters.deviceId || "Select a device to load usage data"}</p></div>
-          {rank && <div className={"rank rank-" + (rank.position + 1)} aria-label={`${rank.entry.app} is this week's ${RANKS[rank.position].toLowerCase()}`}><span className="rank-badge">{rank.position + 1}</span><span className="rank-text"><small>{RANKS[rank.position]}</small><strong><AppIcon app={rank.entry.app} url={rank.entry.iconUrl} size={18} />{rank.entry.app}</strong></span><em>{duration(rank.entry.usageMilliseconds)}</em></div>}
+          {rank && <Tooltip><TooltipTrigger render={<div className={"rank rank-" + (rank.position + 1)} aria-label={`${rank.entry.app} is today's ${RANKS[rank.position].toLowerCase()}`} />}><span className="rank-badge">{rank.position + 1}</span><span className="rank-text"><small>{RANKS[rank.position]}</small><strong><AppIcon app={rank.entry.app} url={rank.entry.iconUrl} size={18} />{rank.entry.app}</strong></span><em>{duration(rank.entry.usageMilliseconds)}</em></TooltipTrigger><TooltipContent side="top">Ranked by today's usage — resets at midnight</TooltipContent></Tooltip>}
           <div className="report-range"><span>Range</span><strong>{rangeLabel}</strong></div></article>
         <section id="activity" className="activity"><article className="panel trend-panel"><header><div><h2 className="trend-title">{filters.app ? <><AppIcon app={filters.app} url={filterOptions.appIcons[filters.app]} size={30} /><span className="sr-only">{filters.app}</span></> : "Select an app"}</h2></div><div className="rollup-controls"><DateRangeChip from={filters.from} to={filters.to} earliestUsageAt={filterOptions.earliestUsageAt} availableDates={filterOptions.availableDates} onChange={(from, to) => setFilters((current) => ({ ...current, from, to }))} /><GranularitySelect value={filters.granularity} onChange={(value) => update("granularity", value)} /></div></header>{data ? <Trend rollups={data.rollups} from={filters.from} to={filters.to} granularity={filters.granularity} /> : <div className="chart-empty">Chris's usage trend will appear here once a report is loaded.</div>}</article></section>
         <div className="metrics"><Metric label="Total Time Tracked" value={data ? duration(total) : "—"} detail={data ? rangeLabel : "Load a report to begin"} icon="◷"><div className="metric-secondary"><p>Time Tracked [ past week ]</p><strong>{data ? duration(data.pastWeekMilliseconds) : "—"}</strong></div></Metric><Metric id="session" label="Longest Session [ past week ]" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
@@ -217,18 +217,18 @@ function App() {
 
       </>}</main>
     <nav className={"glass-nav " + (navExpanded ? "is-expanded" : "is-collapsed")} aria-label="Primary navigation">
-      {navExpanded ? <>
-        <a className={"glass-nav__link " + (page === "pipeline" ? "is-current" : "")} href="#pipeline" aria-label="Data pipeline">
-          <span className="glass-nav__icon"><PipelineIcon /></span>
-          <span className="glass-nav__label">Pipeline</span>
-        </a>
-        <a className={"glass-nav__link " + (page === "overview" ? "is-current" : "")} href="#overview" aria-label="Dashboard">
-          <span className="glass-nav__icon"><HomeIcon /></span>
-          <span className="glass-nav__label">Dashboard</span>
-        </a>
-      </> : <button type="button" className="glass-nav__link glass-nav__link--collapsed is-current" onClick={() => setNavExpanded(true)} aria-expanded={false} aria-label={`Show navigation, currently on ${page === "pipeline" ? "Pipeline" : "Dashboard"}`}>
-        <span className="glass-nav__icon">{page === "pipeline" ? <PipelineIcon /> : <HomeIcon />}</span>
-      </button>}
+      {([["pipeline", "Pipeline", <PipelineIcon key="i" />, "#pipeline"], ["overview", "Dashboard", <HomeIcon key="i" />, "#overview"]] as const).map(([id, label, icon, href]) => {
+        const isCurrent = page === id;
+        const hiddenWhileCollapsed = !navExpanded && !isCurrent;
+        return <a key={id} className={"glass-nav__link " + (isCurrent ? "is-current " : "") + (hiddenWhileCollapsed ? "is-hidden" : "")} href={href}
+          aria-hidden={hiddenWhileCollapsed} tabIndex={hiddenWhileCollapsed ? -1 : undefined}
+          aria-expanded={isCurrent ? navExpanded : undefined}
+          aria-label={!navExpanded && isCurrent ? `Show navigation, currently on ${label}` : label}
+          onClick={(event) => { if (!navExpanded) { event.preventDefault(); setNavExpanded(true); } }}>
+          <span className="glass-nav__icon">{icon}</span>
+          <span className={"glass-nav__label" + (navExpanded ? "" : " is-hidden")}>{label}</span>
+        </a>;
+      })}
     </nav>
   </div></TooltipProvider>;
 }
