@@ -145,6 +145,19 @@ public class AnalyticsRepository {
             ORDER BY bucket_start DESC, SUM(usage_milliseconds) DESC, app ASC
             LIMIT 1
             """;
+    // Ranks apps by *today's* usage only (local day, DAY-granularity bucket),
+    // independent of whatever range the caller displays alongside the rank.
+    private static final String FIND_TOP_APP_NAMES_TODAY = """
+            SELECT app
+            FROM app_usage_rollups
+            WHERE device_id = ?
+              AND granularity = 'DAY'
+              AND (bucket_start AT TIME ZONE bucket_timezone)::date = (now() AT TIME ZONE bucket_timezone)::date
+              AND usage_milliseconds > 0
+            GROUP BY app
+            ORDER BY SUM(usage_milliseconds) DESC, app ASC
+            LIMIT ?
+            """;
     private static final String FIND_APP_ICONS = """
             SELECT app, icon_url
             FROM app_icons
@@ -305,6 +318,24 @@ public class AnalyticsRepository {
                 Timestamp.from(to),
                 limit
         );
+    }
+
+    private List<String> findTopAppNamesToday(String deviceId, int limit) {
+        return jdbcTemplate.queryForList(FIND_TOP_APP_NAMES_TODAY, String.class, deviceId, limit);
+    }
+
+    public Optional<String> findTopAppToday(String deviceId) {
+        return findTopAppNamesToday(deviceId, 1).stream().findFirst();
+    }
+
+    // Which apps rank as #1/#2/#3 is scored by today's usage; the duration shown
+    // alongside each rank is still the caller's own [from, to) window (e.g. the
+    // past week), unchanged. An app with no usage today won't be ranked, even if
+    // it has usage in [from, to).
+    public List<TopApp> findTopAppsScoredByToday(String deviceId, Instant from, Instant to, int limit) {
+        return findTopAppNamesToday(deviceId, limit).stream()
+                .map(app -> new TopApp(app, findUsageTotal(deviceId, app, from, to), findAppIcon(app)))
+                .toList();
     }
 
     public Optional<String> findTopAppOnLatestDay(String deviceId) {
