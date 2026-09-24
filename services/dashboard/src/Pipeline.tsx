@@ -228,7 +228,7 @@ export function Pipeline() {
 
   return <section id="pipeline" className="pipeline-page" aria-label="Data pipeline">
     <header className="pipeline-intro">
-      <p className="pipeline-live" aria-live="polite"><i aria-hidden="true" />{lastEvent ? `Live · ${liveEventLabel(lastEvent)}` : "Live · open an app on your iPhone to watch its event flow through"}</p>
+      <p className="pipeline-live" aria-live="polite"><i aria-hidden="true" />{lastEvent ? `Live phone usage · ${liveEventLabel(lastEvent)}` : "Live phone usage · open an app on your iPhone to watch it flow through in real time"}</p>
     </header>
 
     <section className="arch" ref={archRef} aria-label="Usage data architecture">
