@@ -10,7 +10,7 @@ import java.util.Set;
 // A wrong logo is worse than the letter fallback, so matching is strict.
 final class AppIconMatcher {
 
-    private static final int MIN_PREFIX_LENGTH = 4;
+    private static final int MIN_PREFIX_LENGTH = 3;
 
     // iOS system apps: only Apple's own listing is right, and several (Settings,
     // Wallet) aren't in the App Store at all, where a looser match finds an
