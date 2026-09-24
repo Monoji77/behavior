@@ -70,6 +70,8 @@ jobs:
           args: -strict -summary -kubernetes-version 1.36.0 behavior-rendered.yaml behavior-staging-rendered.yaml
       - name: Install promotion parser
         run: python3 -m pip install PyYAML==6.0.2
+      - name: Check container commands survive Kubernetes $$ expansion
+        run: python3 .github/scripts/check_container_commands.py behavior-rendered.yaml behavior-staging-rendered.yaml
       - name: Check staging cannot touch production data
         run: python3 .github/scripts/check_staging_isolation.py behavior-staging-rendered.yaml behavior-rendered.yaml
       - name: Test promotion and staging isolation checks
