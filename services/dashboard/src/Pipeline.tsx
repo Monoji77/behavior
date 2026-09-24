@@ -23,10 +23,10 @@ const deadLetter: PipelineStep = { id: "dlq", label: "Park", title: "Dead-letter
 const stages = [...steps, deadLetter];
 
 const tiers: Record<Tier, { name: string; role: string }> = {
-  source: { name: "Source", role: "Where events originate" },
+  source: { name: "Source", role: "" },
   backend: { name: "Backend", role: "Services that ingest, process and serve" },
-  database: { name: "Database", role: "Durable storage" },
-  client: { name: "Client", role: "Frontend" }
+  database: { name: "Database", role: "" },
+  client: { name: "Client", role: "" }
 };
 
 const tierLabel = (step: PipelineStep) => tiers[step.tier].name + (step.lane ? ` · ${step.lane} path` : "");
@@ -53,7 +53,7 @@ function Node({ step, selectedId, onSelect, register }: { step: PipelineStep; se
 }
 
 function GroupHeader({ tier, lane, role }: { tier: Tier; lane?: string; role?: string }) {
-  return <header className="arch-group__header"><span>{tiers[tier].name}{lane && <em> · {lane}</em>}</span><small>{role ?? tiers[tier].role}</small></header>;
+  return <header className="arch-group__header"><span>{tiers[tier].name}{lane && <em> · {lane}</em>}</span>{(role ?? tiers[tier].role) && <small>{role ?? tiers[tier].role}</small>}</header>;
 }
 
 type Wire = { from: string; to: string; d: string; start: [number, number]; end: [number, number] };
@@ -103,6 +103,16 @@ function spreadSharedAnchors(routes: Route[]) {
 
 // Length of the arrowhead; the line stops at its base so nothing shows past the tip.
 const ARROW = 9;
+
+// A side branch drops straight down from its source, then turns into the target's
+// nearer side, so it never cuts across the stages it passes.
+function branchWire(from: string, to: string, a: DOMRect, b: DOMRect, nodeA: DOMRect): Wire {
+  const toLeft = b.left + b.width / 2 < a.left + a.width / 2;
+  const start: Point = [a.left + a.width / 2 + (toLeft ? -a.width * 0.18 : a.width * 0.18), nodeA.bottom];
+  const end: Point = [toLeft ? b.right : b.left, b.top + b.height / 2];
+  const lineEnd: Point = [end[0] + (toLeft ? ARROW : -ARROW), end[1]];
+  return { from, to, start, end, d: `M${start} C${start[0]},${end[1]} ${start[0]},${end[1]} ${lineEnd}` };
+}
 
 function toWire(r: Route): Wire {
   const { start, end } = r;
@@ -202,10 +212,9 @@ export function Pipeline() {
       const nodeRect = (id: string) => relative((visuals.current.get(id)!.closest(".arch-node") ?? visuals.current.get(id)!).getBoundingClientRect());
       const present = ({ from, to }: { from: string; to: string }) => visuals.current.has(from) && visuals.current.has(to);
       const routes = flow.filter(present).map(({ from, to }) => route(from, to, rect(from), rect(to), nodeRect(from), nodeRect(to)));
-      const branchRoutes = branches.filter(present).map(({ from, to }) => route(from, to, rect(from), rect(to), nodeRect(from), nodeRect(to)));
-      spreadSharedAnchors([...routes, ...branchRoutes]);
+      spreadSharedAnchors(routes);
       setWires(routes.map(toWire));
-      setBranchWires(branchRoutes.map(toWire));
+      setBranchWires(branches.filter(present).map(({ from, to }) => branchWire(from, to, rect(from), rect(to), nodeRect(from))));
     };
     measure();
     const observer = new ResizeObserver(measure);

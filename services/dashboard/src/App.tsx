@@ -89,6 +89,9 @@ function App() {
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [], topApp: null, appIcons: {} });
   const [optionsLoading, setOptionsLoading] = useState(true);
+  // Desktop sidebar can collapse to an icon rail; remembered per browser.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => { try { return localStorage.getItem("behavior-sidebar") === "collapsed"; } catch { return false; } });
+  const toggleSidebar = () => setSidebarCollapsed((current) => { try { localStorage.setItem("behavior-sidebar", current ? "expanded" : "collapsed"); } catch { /* storage unavailable */ } return !current; });
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
   const [page, setPage] = useState<"overview" | "pipeline">(() => window.location.hash === "#pipeline" ? "pipeline" : "overview");
@@ -177,8 +180,8 @@ function App() {
     }
   }
 
-  return <TooltipProvider delay={150}><div className="shell">
-    <aside className="sidebar"><a className="brand" href="#overview" aria-label="Digital Habits by Chris Yong"><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h3.5l2.2-5.5 4.1 11 2.6-7.2 1.4 1.7H21" /></svg></span><span className="brand-text"><strong>Digital Habits</strong><small>by Chris Yong</small></span></a><nav aria-label="Dashboard navigation"><a className={page === "overview" ? "selected" : ""} href="#overview">▦ Overview</a><a className={page === "pipeline" ? "selected" : ""} href="#pipeline">⌘ Pipeline</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
+  return <TooltipProvider delay={150}><div className={`shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
+    <aside className="sidebar"><a className="brand" href="#overview" aria-label="Digital Habits by Chris Yong"><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h3.5l2.2-5.5 4.1 11 2.6-7.2 1.4 1.7H21" /></svg></span><span className="brand-text"><strong>Digital Habits</strong><small>by Chris Yong</small></span></a><button type="button" className="sidebar-toggle" onClick={toggleSidebar} aria-expanded={!sidebarCollapsed} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 5 7.5 10l5 5" /></svg></button><nav aria-label="Dashboard navigation"><a className={page === "overview" ? "selected" : ""} href="#overview" title="Overview"><span className="nav-icon" aria-hidden="true">▦</span><span className="nav-label">Overview</span></a><a className={page === "pipeline" ? "selected" : ""} href="#pipeline" title="Pipeline"><span className="nav-icon" aria-hidden="true">⌘</span><span className="nav-label">Pipeline</span></a></nav><p className="connection" title="Analytics API connected"><i /> <span className="nav-label">Analytics API connected</span></p></aside>
     <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>{page === "pipeline" ? "Data pipeline" : "Usage overview"}</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
       {page === "pipeline" ? <Pipeline /> : <><section className="filters" aria-label="Filters"><div className="filter-intro"><p className="eyebrow">Explore activity</p><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <FilterMenu loading={optionsLoading} fields={[
