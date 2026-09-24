@@ -15,10 +15,10 @@ patches:
     \  name: LIVE_ANONYMOUS\n    value: \"true\""
 images:
 - name: ghcr.io/monoji77/behavior-ingestion-api
-  newTag: 81d63e252b10c8dd79e5e76037a7db1426328c45
+  newTag: 60b46a54be91a18b40e8d3602d846761cb39900e
 - name: ghcr.io/monoji77/behavior-stream-processor
-  newTag: 81d63e252b10c8dd79e5e76037a7db1426328c45
+  newTag: 60b46a54be91a18b40e8d3602d846761cb39900e
 - name: ghcr.io/monoji77/behavior-analytics-api
-  newTag: 81d63e252b10c8dd79e5e76037a7db1426328c45
+  newTag: 60b46a54be91a18b40e8d3602d846761cb39900e
 - name: ghcr.io/monoji77/behavior-dashboard
-  newTag: 81d63e252b10c8dd79e5e76037a7db1426328c45
+  newTag: 60b46a54be91a18b40e8d3602d846761cb39900e
