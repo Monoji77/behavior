@@ -1,17 +1,28 @@
-import { Fragment, useState } from "react";
+import { useState } from "react";
 
 type LayerKind = "phone" | "api" | "broker" | "processor" | "database" | "dashboard";
-type PipelineStep = { id: string; label: string; title: string; detail: string; event: string; kind: LayerKind };
+type Tier = "source" | "backend" | "database" | "client";
+type PipelineStep = { id: string; label: string; title: string; detail: string; event: string; kind: LayerKind; tier: Tier; lane?: "write" | "read" };
 
+// Flow order: numbered 1-7 on the diagram.
 const steps: PipelineStep[] = [
-  { id: "capture", label: "Capture", title: "iPhone Shortcut", detail: "An automation records an OPEN or CLOSE event with the app, device, and timestamp.", event: "OPEN · CLOSE", kind: "phone" },
-  { id: "ingest", label: "Validate", title: "Ingestion API", detail: "The API authenticates the collector and validates the versioned event contract before accepting it.", event: "authenticated JSON", kind: "api" },
-  { id: "stream", label: "Buffer", title: "Kafka", detail: "Kafka keeps events durable and preserves their order for each device while downstream processing catches up.", event: "device-keyed event", kind: "broker" },
-  { id: "transform", label: "Transform", title: "Stream processor", detail: "The processor safely writes source events, joins app opens and closes into sessions, and builds time rollups.", event: "session · rollup", kind: "processor" },
-  { id: "store", label: "Store", title: "TimescaleDB", detail: "The database retains raw events, completed sessions, and usage rollups as the traceable source behind every metric.", event: "raw · derived data", kind: "database" },
-  { id: "serve", label: "Serve", title: "Analytics API", detail: "The API reads the derived data and returns the usage report, trend, and session metrics requested by the dashboard.", event: "dashboard metrics", kind: "api" },
-  { id: "dashboard", label: "See", title: "Your dashboard", detail: "The report turns the processed events into the usage patterns, sessions, and trends you are exploring now.", event: "your insights", kind: "dashboard" }
+  { id: "capture", label: "Capture", title: "iPhone Shortcut", detail: "An automation records an OPEN or CLOSE event with the app, device, and timestamp.", event: "OPEN · CLOSE", kind: "phone", tier: "source" },
+  { id: "ingest", label: "Validate", title: "Ingestion API", detail: "The API authenticates the collector and validates the versioned event contract before accepting it.", event: "authenticated JSON", kind: "api", tier: "backend", lane: "write" },
+  { id: "stream", label: "Buffer", title: "Kafka", detail: "Kafka keeps events durable and preserves their order for each device while downstream processing catches up.", event: "device-keyed event", kind: "broker", tier: "backend", lane: "write" },
+  { id: "transform", label: "Transform", title: "Stream processor", detail: "The processor safely writes source events, joins app opens and closes into sessions, and builds time rollups.", event: "session · rollup", kind: "processor", tier: "backend", lane: "write" },
+  { id: "store", label: "Store", title: "TimescaleDB", detail: "The database retains raw events, completed sessions, and usage rollups as the traceable source behind every metric.", event: "raw · derived data", kind: "database", tier: "database" },
+  { id: "serve", label: "Serve", title: "Analytics API", detail: "The API reads the derived data and returns the usage report, trend, and session metrics requested by the dashboard.", event: "dashboard metrics", kind: "api", tier: "backend", lane: "read" },
+  { id: "dashboard", label: "See", title: "Your dashboard", detail: "The report turns the processed events into the usage patterns, sessions, and trends you are exploring now.", event: "your insights", kind: "dashboard", tier: "client" }
 ];
+
+const tiers: Record<Tier, { name: string; role: string }> = {
+  source: { name: "Source", role: "Where events originate" },
+  backend: { name: "Backend", role: "Services that ingest, process and serve" },
+  database: { name: "Database", role: "Durable storage" },
+  client: { name: "Client", role: "Frontend" }
+};
+
+const tierLabel = (step: PipelineStep) => tiers[step.tier].name + (step.lane ? ` · ${step.lane} path` : "");
 
 function LayerGlyph({ kind }: { kind: LayerKind }) {
   if (kind === "phone") return <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="13" y="4" width="22" height="40" rx="4" /><path d="M20 9h8M21 38h6" /><path d="m19 24 3 3 7-7" /></svg>;
@@ -22,39 +33,72 @@ function LayerGlyph({ kind }: { kind: LayerKind }) {
   return <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="8" width="36" height="26" rx="3" /><path d="M18 41h12m-6-7v7M12 27l7-7 6 4 9-9" /></svg>;
 }
 
+function Node({ step, selectedId, onSelect, flowsRight }: { step: PipelineStep; selectedId: string; onSelect: (id: string) => void; flowsRight?: boolean }) {
+  return <button type="button" className={`pipeline-node pipeline-node--${step.kind} arch-node ${flowsRight ? "arch-node--flows-right" : ""} ${selectedId === step.id ? "is-selected" : ""}`} aria-pressed={selectedId === step.id} onClick={() => onSelect(step.id)}>
+    <span className="arch-node__step" aria-label={`Step ${steps.indexOf(step) + 1}`}>{steps.indexOf(step) + 1}</span>
+    <span className="pipeline-node__visual" aria-hidden="true"><LayerGlyph kind={step.kind} /></span>
+    <span className="pipeline-node__label">{step.label}</span>
+    <strong>{step.title}</strong>
+    <small>{step.event}</small>
+    {flowsRight && <span className="arch-link arch-link--right" aria-hidden="true"><i /></span>}
+  </button>;
+}
+
+function GroupHeader({ tier, lane, role }: { tier: Tier; lane?: string; role?: string }) {
+  return <header className="arch-group__header"><span>{tiers[tier].name}{lane && <em> · {lane}</em>}</span><small>{role ?? tiers[tier].role}</small></header>;
+}
+
+// Vertical link between tiers; "up" on the wide layout means data flows upward there.
+function Link({ area, direction }: { area: string; direction: "down" | "up" }) {
+  return <span className={`arch-link arch-link--vertical arch-link--${direction}`} style={{ gridArea: area }} aria-hidden="true"><i /></span>;
+}
+
 export function Pipeline() {
   const [selectedId, setSelectedId] = useState(steps[0].id);
   const selected = steps.find((step) => step.id === selectedId) ?? steps[0];
+  const step = (id: string) => steps.find((candidate) => candidate.id === id)!;
+  const node = (id: string, flowsRight = false) => <Node step={step(id)} selectedId={selectedId} onSelect={setSelectedId} flowsRight={flowsRight} />;
 
   return <section id="pipeline" className="pipeline-page" aria-labelledby="pipeline-title">
     <header className="pipeline-intro">
       <p className="eyebrow">Live data journey</p>
       <h2 id="pipeline-title">From a phone event to the dashboard</h2>
-      <p>Follow the animated event through each stage. Select a stage to see exactly what it contributes.</p>
+      <p>Events travel from the source through the backend into the database, then back out through the backend to the client. Select a stage to see exactly what it contributes.</p>
     </header>
 
-    <section className="pipeline-journey" aria-label="Usage data pipeline">
-      {steps.map((step, index) => <Fragment key={step.id}>
-        <button type="button" className={`pipeline-node pipeline-node--${step.kind} ${selectedId === step.id ? "is-selected" : ""}`} aria-pressed={selectedId === step.id} onClick={() => setSelectedId(step.id)}>
-          <span className="pipeline-node__visual" aria-hidden="true"><LayerGlyph kind={step.kind} /></span>
-          <span className="pipeline-node__label">{step.label}</span>
-          <strong>{step.title}</strong>
-          <small>{step.event}</small>
-        </button>
-        {index < steps.length - 1 && <span className="pipeline-connector" aria-hidden="true"><i /></span>}
-      </Fragment>)}
+    <section className="arch" aria-label="Usage data architecture">
+      <section className="arch-group arch-group--source" style={{ gridArea: "source" }} aria-label="Source"><GroupHeader tier="source" />{node("capture")}</section>
+      <section className="arch-group arch-group--client" style={{ gridArea: "client" }} aria-label="Client"><GroupHeader tier="client" />{node("dashboard")}</section>
+      <Link area="l-capture" direction="down" />
+      <Link area="l-deliver" direction="up" />
+      <section className="arch-group arch-group--backend" aria-label="Backend">
+        <GroupHeader tier="backend" />
+        <div className="arch-lane arch-lane--write" aria-label="Backend write path">
+          <span className="arch-lane__label">Write path</span>
+          <GroupHeader tier="backend" lane="write path" role="Ingest and process events" />
+          {node("ingest", true)}{node("stream", true)}{node("transform")}
+        </div>
+        <div className="arch-lane arch-lane--read" aria-label="Backend read path">
+          <span className="arch-lane__label">Read path</span>
+          <GroupHeader tier="backend" lane="read path" role="Serve metrics to the client" />
+          {node("serve")}
+        </div>
+      </section>
+      <Link area="l-persist" direction="down" />
+      <Link area="l-query" direction="up" />
+      <section className="arch-group arch-group--database" style={{ gridArea: "database" }} aria-label="Database"><GroupHeader tier="database" />{node("store")}</section>
     </section>
 
     <section className="pipeline-inspector" aria-live="polite" aria-label="Selected pipeline stage">
       <span className="pipeline-inspector__number">{String(steps.indexOf(selected) + 1).padStart(2, "0")}</span>
-      <div><p className="eyebrow">{selected.label}</p><h2>{selected.title}</h2><p>{selected.detail}</p></div>
+      <div><p className="eyebrow">{tierLabel(selected)} · {selected.label}</p><h2>{selected.title}</h2><p>{selected.detail}</p></div>
       <span className="pipeline-inspector__event">{selected.event}</span>
     </section>
 
     <aside className="pipeline-dlq" aria-label="Failure handling">
       <span className="pipeline-dlq__path" aria-hidden="true"><i /></span>
       <span className="pipeline-dlq__icon" aria-hidden="true">!</span>
-      <div><p className="eyebrow">Safe failure path</p><h2>Dead-letter topic</h2><p>Events that cannot be processed are retained for inspection instead of being silently lost. Valid events keep flowing to the dashboard.</p></div>
+      <div><p className="eyebrow">Safe failure path · Backend</p><h2>Dead-letter topic</h2><p>Events the stream processor cannot handle are parked in a Kafka dead-letter topic for inspection instead of being silently lost. Valid events keep flowing to the dashboard.</p></div>
     </aside>
   </section>;
 }
