@@ -7,4 +7,5 @@ resources:
   - behavior-db-config.yaml
   - timescaledb-close-events-migration.yaml
   - timescaledb-app-icons-migration.yaml
+  - timescaledb-pipeline-notify-migration.yaml
   - dashboard.yaml

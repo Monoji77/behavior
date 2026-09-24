@@ -31,7 +31,7 @@ function OptionPanel({ field, loading, focusSearch, onSelect }: { field: FilterF
       {loading ? <li className="no-match">Loading available {noun}s…</li>
         : matches.length ? matches.map((option) => <li key={option}>
           <button type="button" role="option" aria-selected={option === field.value} className="menu-option" onClick={() => onSelect(option)}>
-            {field.ranks?.[option] && <span className="menu-option__rank">{field.ranks[option]}</span>}
+            {field.ranks?.[option] && <span className={`menu-option__rank menu-option__rank--${field.ranks[option]}`}>{field.ranks[option]}</span>}
             {field.icons && <AppIcon app={option} url={field.icons[option]} />}<span>{option}</span>
           </button>
         </li>)
