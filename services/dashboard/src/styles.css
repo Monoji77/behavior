@@ -162,8 +162,20 @@
 
 @media(prefers-reduced-motion:reduce){
   .glass-nav__link,.glass-nav__icon,.pipeline-node{transition:none}
-  .pipeline-node.is-selected .pipeline-node__orb::before,.pipeline-connector i,.pipeline-dlq__path i{animation:none}
+  .pipeline-node.is-selected .pipeline-node__orb::before,.pipeline-connector i,.pipeline-dlq__path i,.pipeline-node__label{animation:none}
 }
+
+/* Moving highlight inspired by the animated-gradient-text treatment. */
+.pipeline-node__label{
+  background:linear-gradient(90deg,#b8a1ff 0%,#75d9ff 34%,#f2b7ff 67%,#b8a1ff 100%);
+  background-size:300% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  color:transparent;
+  animation:pipeline-label-gradient 5s linear infinite;
+}
+@keyframes pipeline-label-gradient{to{background-position:300% center}}
 
 /* Product identity and ranked app choices. */
 .brand{font-size:1rem;letter-spacing:-.025em;line-height:1.25}
