@@ -164,7 +164,7 @@ class MetricsControllerTest {
                                 .thenReturn(26_040_000L);
                 when(analyticsRepository.findLongestSession(eq("iPhone 16 Pro"), eq("Telegram"), any(), any()))
                                 .thenReturn(Optional.empty());
-                when(analyticsRepository.findTopAppsScoredByToday(eq("iPhone 16 Pro"), any(), any(), eq(3)))
+                when(analyticsRepository.findTopAppsScoredByToday(eq("iPhone 16 Pro"), eq(3)))
                                 .thenReturn(List.of(new TopApp("Telegram", 26_040_000L, null)));
 
                 mockMvc.perform(get("/api/v1/metrics/dashboard")

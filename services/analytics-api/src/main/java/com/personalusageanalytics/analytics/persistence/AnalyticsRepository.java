@@ -158,6 +158,19 @@ public class AnalyticsRepository {
             ORDER BY SUM(usage_milliseconds) DESC, app ASC
             LIMIT ?
             """;
+    // Same ranking as above, but also returns each app's today total: both the
+    // rank order and the duration shown next to it come from today's usage.
+    private static final String FIND_TOP_APPS_TODAY = """
+            SELECT app, SUM(usage_milliseconds) AS usage_milliseconds
+            FROM app_usage_rollups
+            WHERE device_id = ?
+              AND granularity = 'DAY'
+              AND (bucket_start AT TIME ZONE bucket_timezone)::date = (now() AT TIME ZONE bucket_timezone)::date
+              AND usage_milliseconds > 0
+            GROUP BY app
+            ORDER BY SUM(usage_milliseconds) DESC, app ASC
+            LIMIT ?
+            """;
     private static final String FIND_APP_ICONS = """
             SELECT app, icon_url
             FROM app_icons
@@ -328,14 +341,15 @@ public class AnalyticsRepository {
         return findTopAppNamesToday(deviceId, 1).stream().findFirst();
     }
 
-    // Which apps rank as #1/#2/#3 is scored by today's usage; the duration shown
-    // alongside each rank is still the caller's own [from, to) window (e.g. the
-    // past week), unchanged. An app with no usage today won't be ranked, even if
-    // it has usage in [from, to).
-    public List<TopApp> findTopAppsScoredByToday(String deviceId, Instant from, Instant to, int limit) {
-        return findTopAppNamesToday(deviceId, limit).stream()
-                .map(app -> new TopApp(app, findUsageTotal(deviceId, app, from, to), findAppIcon(app)))
-                .toList();
+    // Ranks apps #1/#2/#3 by today's usage, and shows each one's today total too
+    // (not the caller's own display window): both the rank order and the
+    // reported duration reset at local midnight. An app with no usage today
+    // won't be ranked, even if it has usage on another day.
+    public List<TopApp> findTopAppsScoredByToday(String deviceId, int limit) {
+        return jdbcTemplate.query(FIND_TOP_APPS_TODAY, (resultSet, rowNumber) -> {
+            String app = resultSet.getString("app");
+            return new TopApp(app, resultSet.getLong("usage_milliseconds"), findAppIcon(app));
+        }, deviceId, limit);
     }
 
     public Optional<String> findTopAppOnLatestDay(String deviceId) {
