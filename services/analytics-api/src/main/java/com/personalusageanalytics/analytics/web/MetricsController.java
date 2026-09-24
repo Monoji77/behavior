@@ -121,18 +121,15 @@ public class MetricsController {
                 weekTo,
                 analyticsRepository.findUsageTotal(deviceId, app, weekFrom, weekTo),
                 analyticsRepository.findLongestSession(deviceId, app, weekFrom, weekTo).orElse(null),
-                analyticsRepository.findTopApps(deviceId, weekFrom, weekTo, 3)
+                analyticsRepository.findTopAppsScoredByToday(deviceId, weekFrom, weekTo, 3)
         );
     }
 
-    // The dashboard's default app: the past 7 days' most-used app, the same one
-    // the report card labels "Top used app". Falls back to the most recent day
-    // with any usage when there is none this week.
+    // The dashboard's default app: today's most-used app so far (the same
+    // scoring as the "Top used app" rank), falling back to the most recent day
+    // with any usage when nothing has been used yet today.
     private String defaultApp(String deviceId) {
-        Instant now = Instant.now();
-        return analyticsRepository.findTopApps(deviceId, now.minus(Duration.ofDays(7)), now, 1).stream()
-                .findFirst()
-                .map(TopApp::app)
+        return analyticsRepository.findTopAppToday(deviceId)
                 .or(() -> analyticsRepository.findTopAppOnLatestDay(deviceId))
                 .orElse(null);
     }
