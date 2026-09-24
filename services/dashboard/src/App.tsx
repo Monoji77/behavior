@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppIcon } from "./AppIcon";
 import { formatDuration } from "./format";
 import { FilterMenu } from "./FilterMenu";
+import { LinkPreview } from "./LinkPreview";
 import { type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, appsWithTopFirst, defaultDateRange, defaultSelection, fillUsageBuckets, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
@@ -94,7 +95,8 @@ function App() {
   const toggleSidebar = () => setSidebarCollapsed((current) => { try { localStorage.setItem("behavior-sidebar", current ? "expanded" : "collapsed"); } catch { /* storage unavailable */ } return !current; });
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
-  const [page, setPage] = useState<"overview" | "pipeline">(() => window.location.hash === "#pipeline" ? "pipeline" : "overview");
+  // Pipeline is the landing page; the dashboard lives at #overview.
+  const [page, setPage] = useState<"overview" | "pipeline">(() => window.location.hash === "#overview" ? "overview" : "pipeline");
   // Device|app whose default date range has been applied; the report waits for it.
   const [rangeKey, setRangeKey] = useState("");
   const hasAppliedDefaultSelection = useRef(false);
@@ -107,7 +109,7 @@ function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("behavior-theme", theme); }, [theme]);
   useEffect(() => {
-    const updatePage = () => setPage(window.location.hash === "#pipeline" ? "pipeline" : "overview");
+    const updatePage = () => setPage(window.location.hash === "#overview" ? "overview" : "pipeline");
     window.addEventListener("hashchange", updatePage);
     return () => window.removeEventListener("hashchange", updatePage);
   }, []);
@@ -181,7 +183,7 @@ function App() {
   }
 
   return <TooltipProvider delay={150}><div className={`shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
-    <aside className="sidebar"><button type="button" className="brand" onClick={toggleSidebar} aria-expanded={!sidebarCollapsed} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h3.5l2.2-5.5 4.1 11 2.6-7.2 1.4 1.7H21" /></svg></span><span className="brand-text"><strong>Digital Habits</strong><small>by Chris Yong</small></span></button><nav aria-label="Dashboard navigation"><a className={page === "overview" ? "selected" : ""} href="#overview" title="Overview"><span className="nav-icon" aria-hidden="true">▦</span><span className="nav-label">Overview</span></a><a className={page === "pipeline" ? "selected" : ""} href="#pipeline" title="Pipeline"><span className="nav-icon" aria-hidden="true">⌘</span><span className="nav-label">Pipeline</span></a></nav><div className="sidebar-links"><a className="portfolio-link" href="https://github.com/Monoji77/behavior/tree/main" target="_blank" rel="noopener noreferrer" title="Source code on GitHub"><svg className="icon-filled" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg><span className="nav-label">Source on GitHub</span></a><a className="portfolio-link" href="https://chrisyong-portfolio.com/" target="_blank" rel="noopener noreferrer" title="Chris Yong's portfolio"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11 3h6v6M17 3l-8 8M14 11v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg><span className="nav-label">My portfolio</span></a></div></aside>
+    <aside className="sidebar"><button type="button" className="brand" onClick={toggleSidebar} aria-expanded={!sidebarCollapsed} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h3.5l2.2-5.5 4.1 11 2.6-7.2 1.4 1.7H21" /></svg></span><span className="brand-text"><strong>Digital Habits</strong><small>by Chris Yong</small></span></button><nav aria-label="Dashboard navigation"><a className={page === "pipeline" ? "selected" : ""} href="#pipeline" title="Pipeline"><span className="nav-icon" aria-hidden="true">⌘</span><span className="nav-label">Pipeline</span></a><a className={page === "overview" ? "selected" : ""} href="#overview" title="Dashboard"><span className="nav-icon" aria-hidden="true">▦</span><span className="nav-label">Dashboard</span></a></nav><div className="sidebar-links"><LinkPreview image="/previews/github.jpg" title="Monoji77/behavior" address="github.com/Monoji77/behavior"><a className="portfolio-link" href="https://github.com/Monoji77/behavior/tree/main" target="_blank" rel="noopener noreferrer"><svg className="icon-filled" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg><span className="nav-label">Source on GitHub</span></a></LinkPreview><LinkPreview image="/previews/portfolio.jpg" title="Chris Yong · Portfolio" address="chrisyong-portfolio.com"><a className="portfolio-link" href="https://chrisyong-portfolio.com/" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11 3h6v6M17 3l-8 8M14 11v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg><span className="nav-label">My portfolio</span></a></LinkPreview></div></aside>
     <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>{page === "pipeline" ? "Data pipeline" : "Usage overview"}</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
       {page === "pipeline" ? <Pipeline /> : <><section className="filters" aria-label="Filters"><div className="filter-intro"><p className="eyebrow">Explore activity</p><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <FilterMenu loading={optionsLoading} fields={[
@@ -201,13 +203,13 @@ function App() {
 
       </>}</main>
     <nav className="glass-nav" aria-label="Primary navigation">
-      <a className={"glass-nav__link " + (page === "overview" ? "is-current" : "")} href="#overview" aria-label="Usage overview">
-        <span className="glass-nav__icon"><HomeIcon /></span>
-        <span className="glass-nav__label">Home</span>
-      </a>
       <a className={"glass-nav__link " + (page === "pipeline" ? "is-current" : "")} href="#pipeline" aria-label="Data pipeline">
         <span className="glass-nav__icon"><PipelineIcon /></span>
         <span className="glass-nav__label">Pipeline</span>
+      </a>
+      <a className={"glass-nav__link " + (page === "overview" ? "is-current" : "")} href="#overview" aria-label="Dashboard">
+        <span className="glass-nav__icon"><HomeIcon /></span>
+        <span className="glass-nav__label">Dashboard</span>
       </a>
     </nav>
   </div></TooltipProvider>;

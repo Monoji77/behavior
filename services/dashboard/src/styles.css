@@ -364,3 +364,11 @@ button.brand:focus-visible{outline:2px solid var(--accent-bright);outline-offset
 .is-sidebar-collapsed main{padding-left:4.8rem}
 @media (max-width:820px){.is-sidebar-collapsed main{padding-left:.75rem}}
 
+/* Link preview cards (GitHub, portfolio). */
+.link-preview{background:var(--surface);border:1px solid var(--line);border-radius:.9rem;box-shadow:var(--shadow);display:grid;overflow:hidden;transform-origin:var(--transform-origin);transition:opacity .15s ease,transform .15s ease;width:280px}
+.link-preview[data-starting-style],.link-preview[data-ending-style]{opacity:0;transform:scale(.96)}
+.link-preview img{aspect-ratio:16/10;border-bottom:1px solid var(--line);display:block;height:auto;object-fit:cover;object-position:top;width:100%}
+.link-preview__text{display:grid;gap:.15rem;padding:.6rem .75rem .7rem}
+.link-preview__text strong{color:var(--text);font-size:.8rem}
+.link-preview__text small{color:var(--faint);font-size:.7rem}
+
