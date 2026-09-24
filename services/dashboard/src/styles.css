@@ -286,3 +286,17 @@
 }
 @media (prefers-reduced-motion:reduce){.iso-slide,.iso-notify,.arch .pipeline-node.is-selected .pipeline-node__visual::before{animation:none}}
 
+/* Live activity: an event's logo gliding through the pipeline. */
+.arch-token{left:0;pointer-events:none;position:absolute;top:0;will-change:transform;z-index:4}
+.arch-token__bubble{align-items:center;animation:arch-token-in .3s ease-out;background:var(--surface);border:2px solid var(--accent-bright);border-radius:50%;box-shadow:0 0 0 5px var(--accent-soft),0 8px 20px rgba(0,0,0,.35);display:flex;height:2.4rem;justify-content:center;left:0;position:absolute;top:0;transform:translate(-50%,-50%);width:2.4rem}
+.arch-token__bubble i{background:var(--accent-bright);border-radius:50%;height:.7rem;width:.7rem}
+.arch-token em{background:var(--accent);border-radius:999px;color:#fff;font-size:.55rem;font-style:normal;font-weight:800;left:0;letter-spacing:.06em;padding:.1rem .35rem;position:absolute;top:1.45rem;transform:translateX(-50%)}
+.arch-token--close .arch-token__bubble{border-color:var(--tier-client)}
+.arch-token--close em{background:color-mix(in srgb,var(--tier-client) 70%,#0b3b2c)}
+@keyframes arch-token-in{from{opacity:0;transform:translate(-50%,-50%) scale(.4)}}
+.arch .pipeline-node.is-receiving .pipeline-node__visual{animation:arch-receive .7s ease-out}
+@keyframes arch-receive{30%{filter:drop-shadow(0 0 18px var(--tier));transform:translateY(-4px) scale(1.08)}}
+.pipeline-live{align-items:center;color:var(--muted);display:flex;font-size:.8rem;font-weight:600;gap:.5rem;margin-top:.7rem}
+.pipeline-live i{animation:iso-notify 1.6s ease-in-out infinite;background:var(--green);border-radius:50%;box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 18%,transparent);height:.5rem;width:.5rem}
+@media (prefers-reduced-motion:reduce){.pipeline-live i,.arch .pipeline-node.is-receiving .pipeline-node__visual{animation:none}}
+

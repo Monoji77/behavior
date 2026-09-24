@@ -1,5 +1,7 @@
-import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApiCloudArt, DashboardArt, DatabaseArt, KafkaArt, PhoneArt, WorkerArt } from "./PipelineArt";
+import { AppIcon } from "./AppIcon";
+import { type LiveEvent, flyToken, liveEventLabel } from "./liveFlow";
 
 type LayerKind = "phone" | "api" | "broker" | "processor" | "database" | "dashboard";
 type Tier = "source" | "backend" | "database" | "client";
@@ -36,7 +38,7 @@ const art: Record<string, ReactNode> = {
 };
 
 function Node({ step, selectedId, onSelect, register }: { step: PipelineStep; selectedId: string; onSelect: (id: string) => void; register: (id: string, element: HTMLElement | null) => void }) {
-  return <button type="button" className={`pipeline-node pipeline-node--${step.kind} arch-node arch-node--${step.tier} ${selectedId === step.id ? "is-selected" : ""}`} aria-pressed={selectedId === step.id} onClick={() => onSelect(step.id)}>
+  return <button type="button" className={`pipeline-node pipeline-node--${step.kind} arch-node arch-node--${step.tier} ${selectedId === step.id ? "is-selected" : ""}`} data-step={step.id} aria-pressed={selectedId === step.id} onClick={() => onSelect(step.id)}>
     <span className="arch-node__step" aria-label={`Step ${steps.indexOf(step) + 1}`}>{steps.indexOf(step) + 1}</span>
     <span className="pipeline-node__visual" ref={(element) => register(step.id, element)} aria-hidden="true">{art[step.id]}</span>
     <span className="pipeline-node__label">{step.label}</span>
@@ -134,6 +136,27 @@ function Wires({ wires, selectedId }: { wires: Wire[]; selectedId: string }) {
   </svg>;
 }
 
+// A live event's logo gliding through the pipeline; pulses each stage it reaches.
+function LiveToken({ event, arch, onDone }: { event: LiveEvent; arch: HTMLElement; onDone: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const token = ref.current;
+    if (!token) return;
+    const pulse = (stepId: string) => {
+      const node = arch.querySelector(`[data-step="${stepId}"]`);
+      node?.classList.add("is-receiving");
+      window.setTimeout(() => node?.classList.remove("is-receiving"), 700);
+    };
+    const paths = [...arch.querySelectorAll<SVGPathElement>("path.arch-wire")];
+    pulse(flow[0].from);
+    return flyToken(paths, token, (wire) => pulse(flow[wire].to), onDone);
+  }, [arch, onDone]);
+  return <div ref={ref} className={`arch-token arch-token--${event.kind.toLowerCase()}`} aria-hidden="true">
+    <span className="arch-token__bubble">{event.app ? <AppIcon app={event.app} url={event.iconUrl} size={26} /> : <i />}</span>
+    <em>{event.kind}</em>
+  </div>;
+}
+
 export function Pipeline() {
   const [selectedId, setSelectedId] = useState(steps[0].id);
   const selected = steps.find((step) => step.id === selectedId) ?? steps[0];
@@ -143,6 +166,22 @@ export function Pipeline() {
   const [wires, setWires] = useState<Wire[]>([]);
   const register = useCallback((id: string, element: HTMLElement | null) => { if (element) visuals.current.set(id, element); else visuals.current.delete(id); }, []);
   const node = (id: string) => <Node step={step(id)} selectedId={selectedId} onSelect={setSelectedId} register={register} />;
+  const [tokens, setTokens] = useState<{ id: number; event: LiveEvent }[]>([]);
+  const [lastEvent, setLastEvent] = useState<LiveEvent | null>(null);
+  const removeToken = useCallback((id: number) => setTokens((current) => current.filter((token) => token.id !== id)), []);
+
+  useEffect(() => {
+    if (typeof EventSource === "undefined") return;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const source = new EventSource("/api/v1/live");
+    let next = 0;
+    source.addEventListener("pipeline", (message) => {
+      const event = JSON.parse((message as MessageEvent<string>).data) as LiveEvent;
+      setLastEvent(event);
+      if (!reduceMotion) setTokens((current) => [...current.slice(-4), { id: next++, event }]);
+    });
+    return () => source.close();
+  }, []);
 
   useLayoutEffect(() => {
     const arch = archRef.current;
@@ -167,10 +206,12 @@ export function Pipeline() {
       <p className="eyebrow">Live data journey</p>
       <h2 id="pipeline-title">From a phone event to the dashboard</h2>
       <p>Events travel from the source through the backend into the database, then back out through the backend to the client. Select a stage to see exactly what it contributes.</p>
+      <p className="pipeline-live" aria-live="polite"><i aria-hidden="true" />{lastEvent ? `Live · ${liveEventLabel(lastEvent)}` : "Live · open an app on your iPhone to watch its event flow through"}</p>
     </header>
 
     <section className="arch" ref={archRef} aria-label="Usage data architecture">
       <Wires wires={wires} selectedId={selectedId} />
+      {archRef.current && tokens.map((token) => <LiveToken key={token.id} event={token.event} arch={archRef.current!} onDone={() => removeToken(token.id)} />)}
       <section className="arch-group arch-group--source" style={{ gridArea: "source" }} aria-label="Source"><GroupHeader tier="source" />{node("capture")}</section>
       <section className="arch-group arch-group--client" style={{ gridArea: "client" }} aria-label="Client"><GroupHeader tier="client" />{node("dashboard")}</section>
       <section className="arch-group arch-group--backend" aria-label="Backend">

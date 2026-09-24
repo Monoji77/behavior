@@ -279,6 +279,11 @@ public class AnalyticsRepository {
         return total == null ? 0 : total;
     }
 
+    public String findAppIcon(String app) {
+        return jdbcTemplate.queryForList("SELECT icon_url FROM app_icons WHERE app = ? AND icon_url IS NOT NULL", String.class, app)
+                .stream().findFirst().orElse(null);
+    }
+
     public Map<String, String> findAppIcons() {
         Map<String, String> icons = new TreeMap<>();
         jdbcTemplate.query(FIND_APP_ICONS, resultSet -> {
