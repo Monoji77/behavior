@@ -201,11 +201,8 @@ export function Pipeline() {
     return () => observer.disconnect();
   }, []);
 
-  return <section id="pipeline" className="pipeline-page" aria-labelledby="pipeline-title">
+  return <section id="pipeline" className="pipeline-page" aria-label="Data pipeline">
     <header className="pipeline-intro">
-      <p className="eyebrow">Live data journey</p>
-      <h2 id="pipeline-title">From a phone event to the dashboard</h2>
-      <p>Events travel from the source through the backend into the database, then back out through the backend to the client. Select a stage to see exactly what it contributes.</p>
       <p className="pipeline-live" aria-live="polite"><i aria-hidden="true" />{lastEvent ? `Live · ${liveEventLabel(lastEvent)}` : "Live · open an app on your iPhone to watch its event flow through"}</p>
     </header>
 
