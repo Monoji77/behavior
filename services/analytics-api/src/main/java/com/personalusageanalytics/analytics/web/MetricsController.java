@@ -121,7 +121,7 @@ public class MetricsController {
                 weekTo,
                 analyticsRepository.findUsageTotal(deviceId, app, weekFrom, weekTo),
                 analyticsRepository.findLongestSession(deviceId, app, weekFrom, weekTo).orElse(null),
-                analyticsRepository.findTopAppsScoredByToday(deviceId, weekFrom, weekTo, 3)
+                analyticsRepository.findTopAppsScoredByToday(deviceId, 3)
         );
     }
 
