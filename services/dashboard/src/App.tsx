@@ -3,7 +3,9 @@ import { Area, AreaChart, CartesianGrid, type TooltipContentProps, XAxis, YAxis 
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppIcon } from "./AppIcon";
+import { formatDuration } from "./format";
 import { FilterMenu } from "./FilterMenu";
+import { LinkPreview } from "./LinkPreview";
 import { type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, appsWithTopFirst, defaultDateRange, defaultSelection, fillUsageBuckets, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
@@ -21,11 +23,7 @@ const dayRange = (day: string) => ({ from: day + "T00:00", to: day + "T23:59" })
 const threeDayRange = (endDay: string) => ({ from: shiftDay(endDay, -2) + "T00:00", to: endDay + "T23:59" });
 const range = () => threeDayRange(isoDay(new Date()));
 const initialRange = range();
-const duration = (milliseconds?: number | null) => {
-  if (!milliseconds) return "—";
-  const minutes = Math.round(milliseconds / 60_000);
-  return minutes >= 60 ? Math.floor(minutes / 60) + "h " + minutes % 60 + " min" : minutes + " min";
-};
+const duration = formatDuration;
 const time = (value?: string | null) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
 const dayFromDateTime = (value: string) => value.slice(0, 10);
 const formatDay = (value: string) => new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(dayFromDateTime(value) + "T12:00:00"));
@@ -60,9 +58,11 @@ function Trend({ rollups, from, to, granularity }: { rollups: DashboardData["rol
   const data = fillUsageBuckets(rollups, from, to, granularity);
   const max = Math.max(...data.map(({ usageMilliseconds }) => usageMilliseconds), 1);
   // Whole-minute ticks (0, 1, 2… or 0, 10, 20…) so small peaks don't read "0 min" several times.
-  const maxMinutes = Math.max(1, Math.ceil(max / 60_000));
-  const tickStep = Math.max(1, Math.ceil(maxMinutes / 4));
-  const yTicks = Array.from({ length: Math.ceil(maxMinutes / tickStep) + 1 }, (_, index) => index * tickStep * 60_000);
+  // Short usage gets a seconds axis; otherwise minutes.
+  const unit = max < 120_000 ? 1_000 : 60_000;
+  const maxUnits = Math.max(1, Math.ceil(max / unit));
+  const tickStep = Math.max(1, Math.ceil(maxUnits / 4));
+  const yTicks = Array.from({ length: Math.ceil(maxUnits / tickStep) + 1 }, (_, index) => index * tickStep * unit);
   return <div className="trend-wrap">
     <ChartContainer config={trendConfig} className="chart-touch-target aspect-auto h-[260px] w-full">
       <AreaChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
@@ -74,12 +74,12 @@ function Trend({ rollups, from, to, granularity }: { rollups: DashboardData["rol
         </defs>
         <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="4 5" />
         <XAxis dataKey="bucketStart" tickLine={false} axisLine={false} tickMargin={10} minTickGap={40} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: string) => axisLabel(value, granularity)} />
-        <YAxis ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={52} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: number) => Math.round(value / 60_000) + " min"} />
+        <YAxis ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={52} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: number) => Math.round(value / unit) + (unit === 1_000 ? " s" : " min")} />
         <ChartTooltip cursor={{ stroke: "var(--color-usage)", strokeDasharray: "3 3" }} content={<TrendTooltip granularity={granularity} />} />
         <Area dataKey="usageMilliseconds" type="monotone" fill="url(#trendFill)" stroke="var(--color-usage)" strokeWidth={3} dot={(props: { cx?: number; cy?: number; index?: number; payload?: { usageMilliseconds: number } }) => props.payload?.usageMilliseconds ? <circle key={props.index} cx={props.cx} cy={props.cy} r={3} fill="var(--panel)" stroke="var(--color-usage)" strokeWidth={2} /> : <g key={props.index} />} activeDot={{ r: 5, fill: "var(--color-usage)", stroke: "var(--panel)", strokeWidth: 2 }} />
       </AreaChart>
     </ChartContainer>
-    <div className="chart-key"><span><i /> Usage time (minutes)</span><span>Peak: {duration(max)}</span></div>
+    <div className="chart-key"><span><i /> Usage time</span><span>Peak: {duration(max)}</span></div>
   </div>;
 }
 
@@ -90,9 +90,13 @@ function App() {
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [], topApp: null, appIcons: {} });
   const [optionsLoading, setOptionsLoading] = useState(true);
+  // Desktop sidebar can collapse to an icon rail; remembered per browser.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => { try { return localStorage.getItem("behavior-sidebar") === "collapsed"; } catch { return false; } });
+  const toggleSidebar = () => setSidebarCollapsed((current) => { try { localStorage.setItem("behavior-sidebar", current ? "expanded" : "collapsed"); } catch { /* storage unavailable */ } return !current; });
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
-  const [page, setPage] = useState<"overview" | "pipeline">(() => window.location.hash === "#pipeline" ? "pipeline" : "overview");
+  // Pipeline is the landing page; the dashboard lives at #overview.
+  const [page, setPage] = useState<"overview" | "pipeline">(() => window.location.hash === "#overview" ? "overview" : "pipeline");
   // Device|app whose default date range has been applied; the report waits for it.
   const [rangeKey, setRangeKey] = useState("");
   const hasAppliedDefaultSelection = useRef(false);
@@ -105,7 +109,7 @@ function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("behavior-theme", theme); }, [theme]);
   useEffect(() => {
-    const updatePage = () => setPage(window.location.hash === "#pipeline" ? "pipeline" : "overview");
+    const updatePage = () => setPage(window.location.hash === "#overview" ? "overview" : "pipeline");
     window.addEventListener("hashchange", updatePage);
     return () => window.removeEventListener("hashchange", updatePage);
   }, []);
@@ -178,10 +182,10 @@ function App() {
     }
   }
 
-  return <TooltipProvider delay={150}><div className="shell">
-    <aside className="sidebar"><a className="brand" href="#overview">Chris's online behavior</a><nav aria-label="Dashboard navigation"><a className={page === "overview" ? "selected" : ""} href="#overview">▦ Overview</a><a className={page === "pipeline" ? "selected" : ""} href="#pipeline">⌘ Pipeline</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
+  return <TooltipProvider delay={150}><div className={`shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
+    <aside className="sidebar"><button type="button" className="brand" onClick={toggleSidebar} aria-expanded={!sidebarCollapsed} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h3.5l2.2-5.5 4.1 11 2.6-7.2 1.4 1.7H21" /></svg></span><span className="brand-text"><strong>Digital Habits</strong><small>by Chris Yong</small></span></button><nav aria-label="Dashboard navigation"><a className={page === "pipeline" ? "selected" : ""} href="#pipeline" title="Pipeline"><span className="nav-icon" aria-hidden="true">⌘</span><span className="nav-label">Pipeline</span></a><a className={page === "overview" ? "selected" : ""} href="#overview" title="Dashboard"><span className="nav-icon" aria-hidden="true">▦</span><span className="nav-label">Dashboard</span></a></nav><div className="sidebar-links"><LinkPreview image="/previews/github.jpg" title="Monoji77/behavior" address="github.com/Monoji77/behavior"><a className="portfolio-link" href="https://github.com/Monoji77/behavior/tree/main" target="_blank" rel="noopener noreferrer"><svg className="icon-filled" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg><span className="nav-label">Source on GitHub</span></a></LinkPreview><LinkPreview image="/previews/portfolio.jpg" title="Chris Yong · Portfolio" address="chrisyong-portfolio.com"><a className="portfolio-link" href="https://chrisyong-portfolio.com/" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11 3h6v6M17 3l-8 8M14 11v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg><span className="nav-label">My portfolio</span></a></LinkPreview></div></aside>
     <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>{page === "pipeline" ? "Data pipeline" : "Usage overview"}</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
-      {page === "pipeline" ? <Pipeline /> : <><section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
+      {page === "pipeline" ? <Pipeline /> : <><section className="filters" aria-label="Filters"><div className="filter-intro"><p className="eyebrow">Explore activity</p><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <FilterMenu loading={optionsLoading} fields={[
           { item: "Device", value: filters.deviceId, placeholder: "Choose a device", tooltip: "Select a device", options: filterOptions.deviceIds, onChange: (value) => update("deviceId", value) },
           { item: "App", value: filters.app, placeholder: "Choose an app", tooltip: "Select an app", options: appsWithTopFirst(filterOptions.apps, data?.topApps), icons: filterOptions.appIcons, ranks: appRanks, onChange: (value) => update("app", value) }
@@ -199,13 +203,13 @@ function App() {
 
       </>}</main>
     <nav className="glass-nav" aria-label="Primary navigation">
-      <a className={"glass-nav__link " + (page === "overview" ? "is-current" : "")} href="#overview" aria-label="Usage overview">
-        <span className="glass-nav__icon"><HomeIcon /></span>
-        <span className="glass-nav__label">Home</span>
-      </a>
       <a className={"glass-nav__link " + (page === "pipeline" ? "is-current" : "")} href="#pipeline" aria-label="Data pipeline">
         <span className="glass-nav__icon"><PipelineIcon /></span>
         <span className="glass-nav__label">Pipeline</span>
+      </a>
+      <a className={"glass-nav__link " + (page === "overview" ? "is-current" : "")} href="#overview" aria-label="Dashboard">
+        <span className="glass-nav__icon"><HomeIcon /></span>
+        <span className="glass-nav__label">Dashboard</span>
       </a>
     </nav>
   </div></TooltipProvider>;

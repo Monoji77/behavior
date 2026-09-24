@@ -45,7 +45,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
+            <!-- compile scope: the live listener uses PGConnection for LISTEN/NOTIFY -->
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

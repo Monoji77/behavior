@@ -19,6 +19,17 @@ patches:
       metadata:
         name: analytics-api
         namespace: behavior
+  # Production's dashboard is public (Tailscale Funnel): stream live activity
+  # without app names, icons or device. Staging (tailnet-only) shows them.
+  - target:
+      kind: Deployment
+      name: analytics-api
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: LIVE_ANONYMOUS
+          value: "true"
 # Promote a release by updating all four tags to the same published commit SHA.
 images:
   - name: ghcr.io/monoji77/behavior-ingestion-api
