@@ -149,7 +149,11 @@ data:
     --
     -- One function per table: raw_app_events is a hypertable whose rows land in
     -- chunk tables, so a trigger can't branch on TG_TABLE_NAME.
-    CREATE OR REPLACE FUNCTION notify_pipeline_open() RETURNS trigger AS $$
+    --
+    -- Function bodies use the named $fn$ dollar-quote tag rather than the bare
+    -- double-dollar form: the migration Job runs this from a Kubernetes container
+    -- command, where Kubernetes collapses a double dollar sign into a single one.
+    CREATE OR REPLACE FUNCTION notify_pipeline_open() RETURNS trigger AS $fn$
     BEGIN
         IF NEW.event_type = 'OPEN' AND NEW.app IS NOT NULL THEN
             PERFORM pg_notify('pipeline_events', json_build_object(
@@ -157,9 +161,9 @@ data:
         END IF;
         RETURN NULL;
     END;
-    $$ LANGUAGE plpgsql;
+    $fn$ LANGUAGE plpgsql;
 
-    CREATE OR REPLACE FUNCTION notify_pipeline_session() RETURNS trigger AS $$
+    CREATE OR REPLACE FUNCTION notify_pipeline_session() RETURNS trigger AS $fn$
     BEGIN
         IF NEW.status = 'COMPLETED' THEN
             PERFORM pg_notify('pipeline_events', json_build_object(
@@ -168,7 +172,7 @@ data:
         END IF;
         RETURN NULL;
     END;
-    $$ LANGUAGE plpgsql;
+    $fn$ LANGUAGE plpgsql;
 
     DROP TRIGGER IF EXISTS raw_app_events_notify ON raw_app_events;
     CREATE TRIGGER raw_app_events_notify AFTER INSERT ON raw_app_events
