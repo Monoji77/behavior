@@ -8,12 +8,17 @@ patches:
     metadata:\n  name: ingestion-api\n  namespace: behavior"
 - patch: "$patch: delete\napiVersion: monitoring.coreos.com/v1\nkind: ServiceMonitor\n\
     metadata:\n  name: analytics-api\n  namespace: behavior"
+- target:
+    kind: Deployment
+    name: analytics-api
+  patch: "- op: add\n  path: /spec/template/spec/containers/0/env/-\n  value:\n  \
+    \  name: LIVE_ANONYMOUS\n    value: \"true\""
 images:
 - name: ghcr.io/monoji77/behavior-ingestion-api
-  newTag: 9172fa2939e25e0988065e2148b1b0a1a12d8d02
+  newTag: 81d63e252b10c8dd79e5e76037a7db1426328c45
 - name: ghcr.io/monoji77/behavior-stream-processor
-  newTag: 9172fa2939e25e0988065e2148b1b0a1a12d8d02
+  newTag: 81d63e252b10c8dd79e5e76037a7db1426328c45
 - name: ghcr.io/monoji77/behavior-analytics-api
-  newTag: 9172fa2939e25e0988065e2148b1b0a1a12d8d02
+  newTag: 81d63e252b10c8dd79e5e76037a7db1426328c45
 - name: ghcr.io/monoji77/behavior-dashboard
-  newTag: 9172fa2939e25e0988065e2148b1b0a1a12d8d02
+  newTag: 81d63e252b10c8dd79e5e76037a7db1426328c45

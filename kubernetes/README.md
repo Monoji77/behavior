@@ -158,3 +158,16 @@ INSERT INTO app_icons (app, icon_url, source) VALUES ('Settings', 'https://…/i
 ON CONFLICT (app) DO UPDATE SET icon_url = EXCLUDED.icon_url, source = 'manual', looked_up_at = NOW();
 ```
 
+## Live pipeline activity
+
+The dashboard's Pipeline page animates each new event as it happens: database
+triggers (`005-create-pipeline-notify.sql`, installed by the
+`timescaledb-pipeline-notify-migration` PreSync Job) `NOTIFY` on channel
+`pipeline_events` when the stream processor stores an OPEN or completes a
+session; the analytics API `LISTEN`s and streams them as Server-Sent Events at
+`/api/v1/live`. It is a visual only; the animation's pacing is not real latency.
+
+Production's dashboard is public, so it streams anonymously
+(`LIVE_ANONYMOUS=true` in `gitops/behavior/kustomization.yaml`: no app, icon or
+device); staging shows real app logos. Remove that patch to show logos publicly.
+

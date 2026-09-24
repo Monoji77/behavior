@@ -33,6 +33,8 @@ class AppIconMatcherTest {
     void acceptsAListingThatAppendsATagline() {
         assertEquals(Optional.of("trip.png"), AppIconMatcher.match("Trip.com", List.of(
                 listing("Trip.com: Book Flights, Hotels", "Trip.com", "trip.png"))));
+        assertEquals(Optional.of("yuu.png"), AppIconMatcher.match("yuu", List.of(
+                listing("yuu SG", "Minden Holdings Pte. Ltd.", "yuu.png"))));
     }
 
     @Test

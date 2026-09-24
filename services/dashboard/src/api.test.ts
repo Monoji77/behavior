@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { liveEventLabel } from "./liveFlow";
+import { formatDuration } from "./format";
 import { appsWithTopFirst, dashboardUrl, defaultDateRange, defaultSelection, fillUsageBuckets, filterOptionsUrl, loadDashboard, selectedAppRank, type FilterOptions, type Filters } from "./api";
 
 const filters: Filters = {
@@ -156,6 +158,27 @@ describe("appsWithTopFirst", () => {
   it("keeps alphabetical order before the top apps are loaded and ignores unknown apps", () => {
     expect(appsWithTopFirst(["Calendar", "Telegram"], undefined)).toEqual(["Calendar", "Telegram"]);
     expect(appsWithTopFirst(["Calendar", "Telegram"], top("Deleted App", "Telegram"))).toEqual(["Telegram", "Calendar"]);
+  });
+});
+
+describe("liveEventLabel", () => {
+  const base = { deviceId: null, at: null, iconUrl: null, durationMilliseconds: null };
+  it("describes opens and closes, with the session length when known", () => {
+    expect(liveEventLabel({ ...base, kind: "OPEN", app: "Telegram" })).toBe("Telegram opened");
+    expect(liveEventLabel({ ...base, kind: "CLOSE", app: "Telegram", durationMilliseconds: 125_000 })).toBe("Telegram closed · 2 min 5 s session");
+  });
+  it("stays generic when the stream is anonymous", () => {
+    expect(liveEventLabel({ ...base, kind: "OPEN", app: null })).toBe("An app opened");
+  });
+});
+
+describe("formatDuration", () => {
+  it("shows seconds under an hour and hours with minutes above", () => {
+    expect(formatDuration(45_000)).toBe("45 s");
+    expect(formatDuration(252_000)).toBe("4 min 12 s");
+    expect(formatDuration(240_000)).toBe("4 min");
+    expect(formatDuration(26_040_000)).toBe("7h 14 min");
+    expect(formatDuration(0)).toBe("—");
   });
 });
 
