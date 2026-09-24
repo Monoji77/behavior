@@ -1,3 +1,5 @@
+import { formatDuration } from "./format";
+
 // Moves a live-event token along the pipeline's wires, stage by stage. Purely a
 // visual: timing is chosen to read smoothly, not to match real processing time.
 
@@ -16,8 +18,7 @@ export const HOP_MILLISECONDS = 380;
 export function liveEventLabel(event: LiveEvent): string {
   const who = event.app ?? "An app";
   if (event.kind === "OPEN") return `${who} opened`;
-  const minutes = event.durationMilliseconds == null ? null : Math.max(1, Math.round(event.durationMilliseconds / 60_000));
-  return minutes == null ? `${who} closed` : `${who} closed · ${minutes} min session`;
+  return event.durationMilliseconds == null ? `${who} closed` : `${who} closed · ${formatDuration(event.durationMilliseconds)} session`;
 }
 
 const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);

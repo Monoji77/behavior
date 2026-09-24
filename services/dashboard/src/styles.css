@@ -299,4 +299,9 @@
 .pipeline-live{align-items:center;color:var(--muted);display:flex;font-size:.8rem;font-weight:600;gap:.5rem;margin-top:.7rem}
 .pipeline-live i{animation:iso-notify 1.6s ease-in-out infinite;background:var(--green);border-radius:50%;box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 18%,transparent);height:.5rem;width:.5rem}
 @media (prefers-reduced-motion:reduce){.pipeline-live i,.arch .pipeline-node.is-receiving .pipeline-node__visual{animation:none}}
+/* Same gold / silver / bronze as the report card's rank badges. */
+.menu-option__rank--1st,.menu-option__rank--2nd,.menu-option__rank--3rd{color:#1e1b4b}
+.menu-option__rank--1st{background:#fbbf24}
+.menu-option__rank--2nd{background:#d1d5db}
+.menu-option__rank--3rd{background:#d9894a}
 

@@ -3,6 +3,7 @@ import { Area, AreaChart, CartesianGrid, type TooltipContentProps, XAxis, YAxis 
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppIcon } from "./AppIcon";
+import { formatDuration } from "./format";
 import { FilterMenu } from "./FilterMenu";
 import { type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, appsWithTopFirst, defaultDateRange, defaultSelection, fillUsageBuckets, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
@@ -21,11 +22,7 @@ const dayRange = (day: string) => ({ from: day + "T00:00", to: day + "T23:59" })
 const threeDayRange = (endDay: string) => ({ from: shiftDay(endDay, -2) + "T00:00", to: endDay + "T23:59" });
 const range = () => threeDayRange(isoDay(new Date()));
 const initialRange = range();
-const duration = (milliseconds?: number | null) => {
-  if (!milliseconds) return "—";
-  const minutes = Math.round(milliseconds / 60_000);
-  return minutes >= 60 ? Math.floor(minutes / 60) + "h " + minutes % 60 + " min" : minutes + " min";
-};
+const duration = formatDuration;
 const time = (value?: string | null) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
 const dayFromDateTime = (value: string) => value.slice(0, 10);
 const formatDay = (value: string) => new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(dayFromDateTime(value) + "T12:00:00"));
@@ -60,9 +57,11 @@ function Trend({ rollups, from, to, granularity }: { rollups: DashboardData["rol
   const data = fillUsageBuckets(rollups, from, to, granularity);
   const max = Math.max(...data.map(({ usageMilliseconds }) => usageMilliseconds), 1);
   // Whole-minute ticks (0, 1, 2… or 0, 10, 20…) so small peaks don't read "0 min" several times.
-  const maxMinutes = Math.max(1, Math.ceil(max / 60_000));
-  const tickStep = Math.max(1, Math.ceil(maxMinutes / 4));
-  const yTicks = Array.from({ length: Math.ceil(maxMinutes / tickStep) + 1 }, (_, index) => index * tickStep * 60_000);
+  // Short usage gets a seconds axis; otherwise minutes.
+  const unit = max < 120_000 ? 1_000 : 60_000;
+  const maxUnits = Math.max(1, Math.ceil(max / unit));
+  const tickStep = Math.max(1, Math.ceil(maxUnits / 4));
+  const yTicks = Array.from({ length: Math.ceil(maxUnits / tickStep) + 1 }, (_, index) => index * tickStep * unit);
   return <div className="trend-wrap">
     <ChartContainer config={trendConfig} className="chart-touch-target aspect-auto h-[260px] w-full">
       <AreaChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
@@ -74,12 +73,12 @@ function Trend({ rollups, from, to, granularity }: { rollups: DashboardData["rol
         </defs>
         <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="4 5" />
         <XAxis dataKey="bucketStart" tickLine={false} axisLine={false} tickMargin={10} minTickGap={40} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: string) => axisLabel(value, granularity)} />
-        <YAxis ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={52} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: number) => Math.round(value / 60_000) + " min"} />
+        <YAxis ticks={yTicks} domain={[0, yTicks[yTicks.length - 1]]} tickLine={false} axisLine={false} width={52} tick={{ fill: "var(--faint)", fontSize: 11 }} tickFormatter={(value: number) => Math.round(value / unit) + (unit === 1_000 ? " s" : " min")} />
         <ChartTooltip cursor={{ stroke: "var(--color-usage)", strokeDasharray: "3 3" }} content={<TrendTooltip granularity={granularity} />} />
         <Area dataKey="usageMilliseconds" type="monotone" fill="url(#trendFill)" stroke="var(--color-usage)" strokeWidth={3} dot={(props: { cx?: number; cy?: number; index?: number; payload?: { usageMilliseconds: number } }) => props.payload?.usageMilliseconds ? <circle key={props.index} cx={props.cx} cy={props.cy} r={3} fill="var(--panel)" stroke="var(--color-usage)" strokeWidth={2} /> : <g key={props.index} />} activeDot={{ r: 5, fill: "var(--color-usage)", stroke: "var(--panel)", strokeWidth: 2 }} />
       </AreaChart>
     </ChartContainer>
-    <div className="chart-key"><span><i /> Usage time (minutes)</span><span>Peak: {duration(max)}</span></div>
+    <div className="chart-key"><span><i /> Usage time</span><span>Peak: {duration(max)}</span></div>
   </div>;
 }
 
