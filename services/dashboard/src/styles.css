@@ -272,9 +272,13 @@
 @media (min-width:1100px){
   .arch{grid-template-areas:"source . . client" "backend backend backend backend" ". . database database";row-gap:3.4rem}
   .arch-group--backend{background:none;border:0}
-  .arch-group--backend::before{display:block}
-  .arch-lane::before{display:none}
-  .arch-lane--read{border-left:0;margin-left:0;padding-left:0}
+  .arch-group--backend{padding-left:0;padding-right:0}
+  .arch-group--backend::before{display:none}
+  .arch-group--backend>.arch-group__header{padding:0 1rem}
+  .arch-lane{padding:.7rem .8rem .9rem}
+  .arch-lane::before{display:block}
+  .arch-lane--read{--tier:color-mix(in srgb,var(--tier-backend) 70%,#f0abfc);border-left:0;margin-left:0;padding-left:.8rem}
+  .arch-lane--read .arch-lane__label{color:var(--tier)}
 }
 @media (max-width:820px){
   .arch .pipeline-node .pipeline-node__visual,.arch .pipeline-node.is-selected .pipeline-node__visual{height:4.8rem;width:5.2rem}

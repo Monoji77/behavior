@@ -54,20 +54,53 @@ const flow = steps.slice(1).map((step, index) => ({ from: steps[index].id, to: s
 
 // A curve from one illustration's edge to the next: horizontal between neighbours
 // in a row, vertical between tiers. Recomputed from the live layout.
+type Point = [number, number];
+type Route = { from: string; to: string; horizontal: boolean; down: boolean; start: Point; end: Point; fromBox: DOMRect; toBox: DOMRect };
+
 // a/b are the illustrations (curves line up with them); nodeA/nodeB are the whole
 // stages, so vertical curves leave below and enter above the labels.
-function curve(a: DOMRect, b: DOMRect, nodeA: DOMRect, nodeB: DOMRect): Pick<Wire, "d" | "start" | "end"> {
+function route(from: string, to: string, a: DOMRect, b: DOMRect, nodeA: DOMRect, nodeB: DOMRect): Route {
   const ay = a.top + a.height / 2, by = b.top + b.height / 2;
-  if (Math.abs(by - ay) < Math.min(a.height, b.height) * 0.5) {
-    const start: [number, number] = [a.right, ay], end: [number, number] = [b.left, by];
-    const k = Math.abs(end[0] - start[0]) * 0.5;
-    return { start, end, d: `M${start} C${start[0] + k},${start[1]} ${end[0] - k},${end[1]} ${end}` };
-  }
+  const horizontal = Math.abs(by - ay) < Math.min(a.height, b.height) * 0.5;
   const down = by > ay;
-  const start: [number, number] = [a.left + a.width / 2, down ? nodeA.bottom : nodeA.top];
-  const end: [number, number] = [b.left + b.width / 2, down ? nodeB.top : nodeB.bottom];
-  const k = Math.abs(end[1] - start[1]) * 0.55 * (down ? 1 : -1);
-  return { start, end, d: `M${start} C${start[0]},${start[1] + k} ${end[0]},${end[1] - k} ${end}` };
+  if (horizontal) return { from, to, horizontal, down, start: [a.right, ay], end: [b.left, by], fromBox: a, toBox: b };
+  return {
+    from, to, horizontal, down, fromBox: a, toBox: b,
+    start: [a.left + a.width / 2, down ? nodeA.bottom : nodeA.top],
+    end: [b.left + b.width / 2, down ? nodeB.top : nodeB.bottom]
+  };
+}
+
+// Where several wires meet one edge of a stage (e.g. two on TimescaleDB's top),
+// spread their anchors across the edge, ordered by where each wire's other end is.
+function spreadSharedAnchors(routes: Route[]) {
+  const groups = new Map<string, { route: Route; end: "start" | "end"; otherX: number; box: DOMRect }[]>();
+  for (const r of routes) {
+    if (r.horizontal) continue;
+    const sides: [string, "start" | "end", number, DOMRect][] = [
+      [`${r.from}:${r.down ? "bottom" : "top"}`, "start", r.end[0], r.fromBox],
+      [`${r.to}:${r.down ? "top" : "bottom"}`, "end", r.start[0], r.toBox]
+    ];
+    for (const [key, end, otherX, box] of sides) groups.set(key, [...(groups.get(key) ?? []), { route: r, end, otherX, box }]);
+  }
+  for (const anchors of groups.values()) {
+    if (anchors.length < 2) continue;
+    anchors.sort((x, y) => x.otherX - y.otherX);
+    const spacing = (anchors[0].box.width * 0.36) / (anchors.length - 1);
+    anchors.forEach(({ route: r, end, box }, index) => {
+      r[end] = [box.left + box.width / 2 + (index - (anchors.length - 1) / 2) * spacing, r[end][1]];
+    });
+  }
+}
+
+function toWire(r: Route): Wire {
+  const { start, end } = r;
+  if (r.horizontal) {
+    const k = Math.abs(end[0] - start[0]) * 0.5;
+    return { from: r.from, to: r.to, start, end, d: `M${start} C${start[0] + k},${start[1]} ${end[0] - k},${end[1]} ${end}` };
+  }
+  const k = Math.abs(end[1] - start[1]) * 0.55 * (r.down ? 1 : -1);
+  return { from: r.from, to: r.to, start, end, d: `M${start} C${start[0]},${start[1] + k} ${end[0]},${end[1] - k} ${end}` };
 }
 
 function Wires({ wires, selectedId }: { wires: Wire[]; selectedId: string }) {
@@ -112,7 +145,9 @@ export function Pipeline() {
       const relative = (r: DOMRect) => new DOMRect(r.left - base.left, r.top - base.top, r.width, r.height);
       const rect = (id: string) => relative(visuals.current.get(id)!.getBoundingClientRect());
       const nodeRect = (id: string) => relative((visuals.current.get(id)!.closest(".arch-node") ?? visuals.current.get(id)!).getBoundingClientRect());
-      setWires(flow.filter(({ from, to }) => visuals.current.has(from) && visuals.current.has(to)).map(({ from, to }) => ({ from, to, ...curve(rect(from), rect(to), nodeRect(from), nodeRect(to)) })));
+      const routes = flow.filter(({ from, to }) => visuals.current.has(from) && visuals.current.has(to)).map(({ from, to }) => route(from, to, rect(from), rect(to), nodeRect(from), nodeRect(to)));
+      spreadSharedAnchors(routes);
+      setWires(routes.map(toWire));
     };
     measure();
     const observer = new ResizeObserver(measure);
