@@ -10,12 +10,12 @@ type PipelineStep = { id: string; label: string; title: string; detail: string; 
 // Flow order: numbered 1-7 on the diagram.
 const steps: PipelineStep[] = [
   { id: "capture", label: "Capture", title: "iPhone Shortcut", detail: "An automation records an OPEN or CLOSE event with the app, device, and timestamp.", event: "OPEN · CLOSE", kind: "phone", tier: "source" },
-  { id: "ingest", label: "Validate", title: "Ingestion API", detail: "A Spring Boot HTTP API that your Shortcut calls. It checks the collector token, validates the versioned event contract, and publishes the event to Kafka.", event: "authenticated JSON", kind: "api", tier: "backend", lane: "write" },
+  { id: "ingest", label: "Validate", title: "Ingestion API", detail: "A Spring Boot HTTP API that Chris's iPhone Shortcut calls. It checks the collector token, validates the versioned event contract, and publishes the event to Kafka.", event: "authenticated JSON", kind: "api", tier: "backend", lane: "write" },
   { id: "stream", label: "Buffer", title: "Kafka", detail: "Kafka keeps every event durable in a partitioned log, keyed by device so each phone's events stay in order while processing catches up.", event: "device-keyed event", kind: "broker", tier: "backend", lane: "write" },
   { id: "transform", label: "Transform", title: "Stream processor", detail: "A Spring Boot background worker with no HTTP API: nothing calls it. It pulls events from Kafka, pairs opens and closes into sessions in plain Java, and writes events, sessions and time rollups to TimescaleDB.", event: "session · rollup", kind: "processor", tier: "backend", lane: "write" },
   { id: "store", label: "Store", title: "TimescaleDB", detail: "The database retains raw events, completed sessions, and usage rollups as the traceable source behind every metric.", event: "raw · derived data", kind: "database", tier: "database" },
   { id: "serve", label: "Serve", title: "Analytics API", detail: "A Spring Boot HTTP API that the dashboard calls. It reads sessions and rollups from TimescaleDB and returns the report, trend and session metrics.", event: "dashboard metrics", kind: "api", tier: "backend", lane: "read" },
-  { id: "dashboard", label: "See", title: "Your dashboard", detail: "The report turns the processed events into the usage patterns, sessions, and trends you are exploring now.", event: "your insights", kind: "dashboard", tier: "client" }
+  { id: "dashboard", label: "See", title: "Chris's dashboard", detail: "The report turns the processed events into the usage patterns, sessions, and trends visitors are watching unfold, live from Chris's phone.", event: "live insights", kind: "dashboard", tier: "client" }
 ];
 
 // Side branch, not a numbered step: where the stream processor parks events it can't handle.
@@ -228,7 +228,7 @@ export function Pipeline() {
 
   return <section id="pipeline" className="pipeline-page" aria-label="Data pipeline">
     <header className="pipeline-intro">
-      <p className="pipeline-live" aria-live="polite"><i aria-hidden="true" />{lastEvent ? `Live phone usage · ${liveEventLabel(lastEvent)}` : "Live phone usage · open an app on your iPhone to watch it flow through in real time"}</p>
+      <p className="pipeline-live" aria-live="polite"><i aria-hidden="true" />{lastEvent ? `Live phone usage · ${liveEventLabel(lastEvent)}` : "Live phone usage · watch Chris's iPhone activity update in real time"}</p>
     </header>
 
     <section className="arch" ref={archRef} aria-label="Usage data architecture">
