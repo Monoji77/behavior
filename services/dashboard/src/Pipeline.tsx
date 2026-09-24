@@ -93,14 +93,21 @@ function spreadSharedAnchors(routes: Route[]) {
   }
 }
 
+// Length of the arrowhead; the line stops at its base so nothing shows past the tip.
+const ARROW = 9;
+
 function toWire(r: Route): Wire {
   const { start, end } = r;
   if (r.horizontal) {
-    const k = Math.abs(end[0] - start[0]) * 0.5;
-    return { from: r.from, to: r.to, start, end, d: `M${start} C${start[0] + k},${start[1]} ${end[0] - k},${end[1]} ${end}` };
+    const dir = end[0] >= start[0] ? 1 : -1;
+    const lineEnd: Point = [end[0] - dir * ARROW, end[1]];
+    const k = Math.abs(lineEnd[0] - start[0]) * 0.5 * dir;
+    return { from: r.from, to: r.to, start, end, d: `M${start} C${start[0] + k},${start[1]} ${lineEnd[0] - k},${lineEnd[1]} ${lineEnd}` };
   }
-  const k = Math.abs(end[1] - start[1]) * 0.55 * (r.down ? 1 : -1);
-  return { from: r.from, to: r.to, start, end, d: `M${start} C${start[0]},${start[1] + k} ${end[0]},${end[1] - k} ${end}` };
+  const dir = r.down ? 1 : -1;
+  const lineEnd: Point = [end[0], end[1] - dir * ARROW];
+  const k = Math.abs(lineEnd[1] - start[1]) * 0.55 * dir;
+  return { from: r.from, to: r.to, start, end, d: `M${start} C${start[0]},${start[1] + k} ${lineEnd[0]},${lineEnd[1] - k} ${lineEnd}` };
 }
 
 function Wires({ wires, selectedId }: { wires: Wire[]; selectedId: string }) {
@@ -109,7 +116,7 @@ function Wires({ wires, selectedId }: { wires: Wire[]; selectedId: string }) {
   const cycle = wires.length * 1.3;
   return <svg className="arch-wires" aria-hidden="true">
     <defs>
-      {(["source", "backend", "database", "client"] as Tier[]).map((tier) => <marker key={tier} id={`wire-head-${tier}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 Z" style={{ fill: `var(--tier-${tier})` }} /></marker>)}
+      {(["source", "backend", "database", "client"] as Tier[]).map((tier) => <marker key={tier} id={`wire-head-${tier}`} viewBox="0 0 10 10" refX="0" refY="5" markerUnits="userSpaceOnUse" markerWidth={ARROW} markerHeight={ARROW} orient="auto"><path d="M0,1 L10,5 L0,9 Z" style={{ fill: `var(--tier-${tier})` }} /></marker>)}
       {wires.map((wire, index) => <linearGradient key={index} id={`wire-paint-${index}`} gradientUnits="userSpaceOnUse" x1={wire.start[0]} y1={wire.start[1]} x2={wire.end[0]} y2={wire.end[1]}>
         <stop offset="0" style={{ stopColor: `var(--tier-${tierOf(wire.from)})` }} />
         <stop offset="1" style={{ stopColor: `var(--tier-${tierOf(wire.to)})` }} />
