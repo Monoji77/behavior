@@ -167,7 +167,8 @@ triggers (`005-create-pipeline-notify.sql`, installed by the
 session; the analytics API `LISTEN`s and streams them as Server-Sent Events at
 `/api/v1/live`. It is a visual only; the animation's pacing is not real latency.
 
-Production's dashboard is public, so it streams anonymously
-(`LIVE_ANONYMOUS=true` in `gitops/behavior/kustomization.yaml`: no app, icon or
-device); staging shows real app logos. Remove that patch to show logos publicly.
+Production's dashboard is public, and it streams real app names, icons and
+device (deliberately, for live demos). To go back to anonymous instead, add
+back a `LIVE_ANONYMOUS=true` env patch for `analytics-api` in
+`gitops/behavior/kustomization.yaml` (see git history for the exact patch).
 
