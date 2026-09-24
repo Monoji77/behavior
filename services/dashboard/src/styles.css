@@ -210,13 +210,6 @@
 .arch-lane--write{display:grid;gap:1.7rem;grid-area:write}.arch-lane--read{grid-area:read}
 .arch .pipeline-node{min-height:0;padding:.55rem .3rem .4rem;position:relative;width:100%}
 .arch-node__step{align-items:center;background:color-mix(in srgb,var(--tier) 22%,var(--surface));border:1px solid color-mix(in srgb,var(--tier) 55%,transparent);border-radius:50%;color:var(--tier);display:inline-flex;font-size:.66rem;font-weight:800;height:1.35rem;justify-content:center;left:.2rem;position:absolute;top:.2rem;width:1.35rem;z-index:1}
-.arch-link{background:color-mix(in srgb,var(--accent) 40%,var(--line));display:block;overflow:visible;pointer-events:none;position:relative}
-.arch-link i{background:var(--accent-bright);border-radius:50%;box-shadow:0 0 0 4px var(--accent-soft);height:.42rem;position:absolute;width:.42rem}
-.arch-link::after{border-right:2px solid var(--accent-bright);border-top:2px solid var(--accent-bright);content:"";height:.42rem;position:absolute;width:.42rem}
-.arch-link--vertical{height:2.4rem;justify-self:center;width:2px}
-.arch-link--vertical i,.arch-link--right i{animation:pipeline-pulse-vertical 1.7s ease-in-out infinite;left:50%;top:0}
-.arch-link--vertical::after,.arch-link--right::after{bottom:-1px;left:50%;transform:translateX(-50%) rotate(135deg)}
-.arch-link--right{height:1.7rem;left:50%;position:absolute;top:100%;width:2px}
 @media (min-width:1100px){
   .arch{column-gap:var(--gap);grid-template-areas:"source . . client" "l-capture . . l-deliver" "backend backend backend backend" ". . l-persist l-query" ". . database database";grid-template-columns:repeat(4,minmax(0,1fr))}
   .arch-group--backend{--tier:var(--accent-bright);background:color-mix(in srgb,var(--tier) 6%,var(--panel));border:1px dashed color-mix(in srgb,var(--tier) 45%,var(--line));display:grid;grid-area:backend;grid-template-columns:subgrid;padding:.85rem 1rem 1rem;row-gap:.45rem}
@@ -225,14 +218,67 @@
   .arch-lane--write{grid-area:auto;grid-column:1/4}.arch-lane--read{border-left:1px dashed color-mix(in srgb,var(--tier) 40%,var(--line));grid-area:auto;grid-column:4/5;margin-left:calc(var(--gap) / -2);padding-left:calc(var(--gap) / 2)}
   .arch-lane .arch-group__header{display:none}
   .arch-lane__label{border-bottom:1px dashed color-mix(in srgb,var(--tier) 30%,var(--line));color:var(--muted);display:block;font-size:.64rem;font-weight:700;grid-column:1/-1;letter-spacing:.07em;margin-bottom:.35rem;padding-bottom:.3rem;text-transform:uppercase}
-  .arch-link--right{height:2px;left:100%;top:2.6rem;width:var(--gap)}
-  .arch-link--right i{animation-name:pipeline-pulse;left:0;top:50%}
-  .arch-link--right::after{bottom:auto;left:auto;right:0;top:50%;transform:translateY(-50%) rotate(45deg)}
-  .arch-link--up i{animation-direction:reverse}
-  .arch-link--up::after{bottom:auto;top:-1px;transform:translateX(-50%) rotate(-45deg)}
   .arch-group--database .pipeline-node{margin:0 auto;max-width:14rem}
 }
 @media (min-width:821px){.arch-node__step{left:calc(50% + 1.75rem)}}
-@media (max-width:820px){.arch .arch-link--right{left:2.7rem}}
-@media (prefers-reduced-motion:reduce){.arch-link i{animation:none}}
+
+@media (prefers-reduced-motion:reduce){}
+
+/* Illustrated pipeline: isometric objects on lit tier floors, joined by measured curved wires. */
+.arch{--tier-source:#38bdf8;--tier-backend:var(--accent-bright);--tier-database:#f59e0b;--tier-client:#34d399;grid-template-areas:"source" "write" "database" "read" "client";position:relative;row-gap:2.6rem}
+.arch-group--source{--tier:var(--tier-source)}.arch-group--backend,.arch-lane{--tier:var(--tier-backend)}.arch-group--database{--tier:var(--tier-database)}.arch-group--client{--tier:var(--tier-client)}
+.arch-group,.arch-lane{background:none;border:0}
+.arch-group::before,.arch-lane::before{background:radial-gradient(ellipse at 50% 60%,color-mix(in srgb,var(--tier) 24%,transparent),transparent 70%),color-mix(in srgb,var(--tier) 6%,transparent);border:1px solid color-mix(in srgb,var(--tier) 30%,transparent);border-radius:2.2rem;bottom:0;box-shadow:0 0 40px color-mix(in srgb,var(--tier) 10%,transparent) inset;content:"";height:100%;left:0;pointer-events:none;position:absolute;right:0;transform:perspective(1200px) rotateX(34deg);transform-origin:50% 100%;z-index:0}
+.arch-group--backend::before{display:none}
+.arch-group__header,.arch-lane__label{position:relative;z-index:2}
+.arch-group__header{gap:0;justify-items:start}.arch-group__header span,.arch-group__header small{background:var(--bg);border-radius:.4rem;margin-left:-.35rem;padding:.04rem .35rem}
+.arch-wires{height:100%;inset:0;overflow:visible;pointer-events:none;position:absolute;width:100%;z-index:1}
+.arch-wire{fill:none;opacity:.5;stroke-linecap:round;stroke-width:2;transition:opacity .2s ease,stroke-width .2s ease}
+.arch-wire.is-active{opacity:1;stroke-width:2.8}
+.arch-dot{filter:drop-shadow(0 0 5px currentColor)}
+.arch .pipeline-node{position:relative;z-index:2}
+.arch .pipeline-node .pipeline-node__visual,.arch .pipeline-node.is-selected .pipeline-node__visual{background:none;border:0;border-radius:0;box-shadow:none;color:inherit;height:6.8rem;overflow:visible;position:relative;width:7.4rem}
+.arch .pipeline-node .pipeline-node__visual::after{display:none}
+.arch .pipeline-node.is-selected .pipeline-node__visual{filter:drop-shadow(0 10px 16px color-mix(in srgb,var(--tier) 45%,transparent));transform:translateY(-4px) scale(1.04)}
+.arch .pipeline-node.is-selected .pipeline-node__visual::before{animation:arch-glow 2.2s ease-in-out infinite;background:radial-gradient(ellipse,color-mix(in srgb,var(--tier) 60%,transparent),transparent 70%);border:0;border-radius:50%;content:"";height:26%;inset:auto 6% -6% 6%;position:absolute;z-index:-1}
+@keyframes arch-glow{50%{opacity:.55;transform:scale(1.12)}}
+.iso{height:100%;overflow:visible;width:100%}
+.arch .pipeline-node .pipeline-node__visual svg.iso{height:100%;stroke:none;width:100%}
+.iso .iso-top{fill:color-mix(in srgb,var(--tier) 40%,#fff)}
+.iso .iso-left{fill:color-mix(in srgb,var(--tier) 80%,#151530)}
+.iso .iso-right{fill:color-mix(in srgb,var(--tier) 48%,#0a0a18)}
+.iso-shadow{fill:color-mix(in srgb,var(--tier) 28%,transparent);filter:blur(3px)}
+.iso-screen{fill:#0e1322}.iso-screen-line{fill:#9aa6c7}
+
+.iso-app{fill:#38bdf8}.iso-app--1{fill:#34d399}.iso-app--2{fill:#f472b6}.iso-app--3{fill:#fbbf24}
+.iso-island{fill:#000}.iso-home{fill:#8b93b3}.iso-notify-icon{fill:#29a9eb}
+.iso-notify{animation:iso-notify 2.4s ease-in-out infinite;fill:#e9eeff}
+.iso-cloud-top{fill:#f4f6ff}
+.iso-cloud-side{fill:color-mix(in srgb,var(--tier) 35%,#8e97bd)}
+.iso-badge path{fill:none;stroke:color-mix(in srgb,var(--tier) 85%,#1a1040);stroke-linecap:round;stroke-linejoin:round;stroke-width:3.2}
+.iso-wire{fill:none;stroke:color-mix(in srgb,var(--tier) 55%,#fff);stroke-width:1.6}
+.iso-lane{fill:color-mix(in srgb,var(--tier) 25%,#0b0f1d)}
+.iso-event .iso-top{fill:color-mix(in srgb,var(--tier) 18%,#fff)}
+.iso-slide{animation:iso-slide 2.6s linear infinite}.iso-slide--1{animation-delay:-.9s}.iso-slide--2{animation-delay:-1.7s}
+.iso-plate{fill:color-mix(in srgb,var(--tier) 20%,transparent);stroke:color-mix(in srgb,var(--tier) 50%,transparent);stroke-width:1.2}
+.iso-graph path{fill:none;stroke:color-mix(in srgb,var(--tier) 70%,#fff);stroke-linecap:round;stroke-width:3.4}
+.iso-node{fill:color-mix(in srgb,var(--tier) 45%,#fff);stroke:var(--tier);stroke-width:3}
+.iso-node--out{fill:var(--tier);stroke:color-mix(in srgb,var(--tier) 55%,#fff)}
+.iso-series{fill:none;stroke:color-mix(in srgb,var(--tier) 80%,#2a1600);stroke-linecap:round;stroke-linejoin:round;stroke-width:2.4}
+.iso-disc .iso-right{opacity:.55}
+.iso-chart{fill:none;stroke:var(--tier-client);stroke-linecap:round;stroke-linejoin:round;stroke-width:2.6}
+@keyframes iso-slide{0%{opacity:0;transform:translate(0,0)}15%,80%{opacity:1}100%{opacity:0;transform:translate(24px,13.9px)}}
+@keyframes iso-notify{0%,100%{opacity:.55}50%{opacity:1}}
+@media (min-width:1100px){
+  .arch{grid-template-areas:"source . . client" "backend backend backend backend" ". . database database";row-gap:3.4rem}
+  .arch-group--backend{background:none;border:0}
+  .arch-group--backend::before{display:block}
+  .arch-lane::before{display:none}
+  .arch-lane--read{border-left:0;margin-left:0;padding-left:0}
+}
+@media (max-width:820px){
+  .arch .pipeline-node .pipeline-node__visual,.arch .pipeline-node.is-selected .pipeline-node__visual{height:4.8rem;width:5.2rem}
+  .arch-lane--write{gap:2.2rem}
+}
+@media (prefers-reduced-motion:reduce){.iso-slide,.iso-notify,.arch .pipeline-node.is-selected .pipeline-node__visual::before{animation:none}}
 
