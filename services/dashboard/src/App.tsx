@@ -98,6 +98,7 @@ function App() {
   const hasAppliedDefaultSelection = useRef(false);
   const loadController = useRef<AbortController | null>(null);
   const rank = selectedAppRank(data?.topApps, filters.app);
+  const appRanks = Object.fromEntries((data?.topApps ?? []).slice(0, 3).map((entry, index) => [entry.app, ["1st", "2nd", "3rd"][index]]));
   const rangeLabel = dayFromDateTime(filters.from) === dayFromDateTime(filters.to) ? formatDay(filters.from) : formatDay(filters.from) + " – " + formatDay(filters.to);
   const total = useMemo(() => data?.rollups.reduce((sum, item) => sum + item.usageMilliseconds, 0) ?? 0, [data]);
   const update = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value }));
@@ -178,12 +179,12 @@ function App() {
   }
 
   return <TooltipProvider delay={150}><div className="shell">
-    <aside className="sidebar"><a className="brand" href="#overview"><b>U</b> Usage<span>OS</span></a><nav aria-label="Dashboard navigation"><a className={page === "overview" ? "selected" : ""} href="#overview">▦ Overview</a><a className={page === "pipeline" ? "selected" : ""} href="#pipeline">⌘ Pipeline</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
+    <aside className="sidebar"><a className="brand" href="#overview">Chris's online behavior</a><nav aria-label="Dashboard navigation"><a className={page === "overview" ? "selected" : ""} href="#overview">▦ Overview</a><a className={page === "pipeline" ? "selected" : ""} href="#pipeline">⌘ Pipeline</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
     <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>{page === "pipeline" ? "Data pipeline" : "Usage overview"}</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
       {page === "pipeline" ? <Pipeline /> : <><section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <FilterMenu loading={optionsLoading} fields={[
           { item: "Device", value: filters.deviceId, placeholder: "Choose a device", tooltip: "Select a device", options: filterOptions.deviceIds, onChange: (value) => update("deviceId", value) },
-          { item: "App", value: filters.app, placeholder: "Choose an app", tooltip: "Select an app", options: appsWithTopFirst(filterOptions.apps, data?.topApps), icons: filterOptions.appIcons, onChange: (value) => update("app", value) }
+          { item: "App", value: filters.app, placeholder: "Choose an app", tooltip: "Select an app", options: appsWithTopFirst(filterOptions.apps, data?.topApps), icons: filterOptions.appIcons, ranks: appRanks, onChange: (value) => update("app", value) }
         ]} />
         <RefreshButton status={refreshStatus} />
       </form></section>
