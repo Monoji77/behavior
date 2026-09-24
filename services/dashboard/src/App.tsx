@@ -97,6 +97,20 @@ function App() {
   const [sparkle, setSparkle] = useState(false);
   // Pipeline is the landing page; the dashboard lives at #overview.
   const [page, setPage] = useState<"overview" | "pipeline">(() => window.location.hash === "#overview" ? "overview" : "pipeline");
+  // Mobile glass nav: collapses to the current page's icon after any scroll, except
+  // when the scroll reaches the very bottom of the page, where it opens back up.
+  const [navExpanded, setNavExpanded] = useState(false);
+  useEffect(() => {
+    const NEAR_BOTTOM_PX = 48;
+    const checkScrollPosition = () => {
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - NEAR_BOTTOM_PX;
+      setNavExpanded(atBottom);
+    };
+    checkScrollPosition();
+    window.addEventListener("scroll", checkScrollPosition, { passive: true });
+    window.addEventListener("resize", checkScrollPosition);
+    return () => { window.removeEventListener("scroll", checkScrollPosition); window.removeEventListener("resize", checkScrollPosition); };
+  }, [page]);
   // Device|app whose default date range has been applied; the report waits for it.
   const [rangeKey, setRangeKey] = useState("");
   const hasAppliedDefaultSelection = useRef(false);
@@ -202,15 +216,19 @@ function App() {
       </section>
 
       </>}</main>
-    <nav className="glass-nav" aria-label="Primary navigation">
-      <a className={"glass-nav__link " + (page === "pipeline" ? "is-current" : "")} href="#pipeline" aria-label="Data pipeline">
-        <span className="glass-nav__icon"><PipelineIcon /></span>
-        <span className="glass-nav__label">Pipeline</span>
-      </a>
-      <a className={"glass-nav__link " + (page === "overview" ? "is-current" : "")} href="#overview" aria-label="Dashboard">
-        <span className="glass-nav__icon"><HomeIcon /></span>
-        <span className="glass-nav__label">Dashboard</span>
-      </a>
+    <nav className={"glass-nav " + (navExpanded ? "is-expanded" : "is-collapsed")} aria-label="Primary navigation">
+      {navExpanded ? <>
+        <a className={"glass-nav__link " + (page === "pipeline" ? "is-current" : "")} href="#pipeline" aria-label="Data pipeline">
+          <span className="glass-nav__icon"><PipelineIcon /></span>
+          <span className="glass-nav__label">Pipeline</span>
+        </a>
+        <a className={"glass-nav__link " + (page === "overview" ? "is-current" : "")} href="#overview" aria-label="Dashboard">
+          <span className="glass-nav__icon"><HomeIcon /></span>
+          <span className="glass-nav__label">Dashboard</span>
+        </a>
+      </> : <button type="button" className="glass-nav__link glass-nav__link--collapsed is-current" onClick={() => setNavExpanded(true)} aria-expanded={false} aria-label={`Show navigation, currently on ${page === "pipeline" ? "Pipeline" : "Dashboard"}`}>
+        <span className="glass-nav__icon">{page === "pipeline" ? <PipelineIcon /> : <HomeIcon />}</span>
+      </button>}
     </nav>
   </div></TooltipProvider>;
 }
