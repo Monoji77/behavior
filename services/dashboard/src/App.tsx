@@ -8,6 +8,7 @@ import { type DashboardData, type Filters, type Granularity, type FilterOptions,
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
 import { RefreshButton, type RefreshStatus } from "./RefreshButton";
+import { Pipeline } from "./Pipeline";
 
 const pad = (value: number) => String(value).padStart(2, "0");
 const isoDay = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -32,6 +33,7 @@ const formatDay = (value: string) => new Intl.DateTimeFormat(undefined, { month:
 function SunIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.7" /><path d="M12 2v2.1M12 19.9V22M4.93 4.93l1.49 1.49M17.58 17.58l1.49 1.49M2 12h2.1M19.9 12H22M4.93 19.07l1.49-1.49M17.58 6.42l1.49-1.49" /></svg>; }
 function MoonIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.7 15.1A8.6 8.6 0 0 1 8.9 3.3 8.7 8.7 0 1 0 20.7 15.1Z" /></svg>; }
 function HomeIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 10.7 8.5-7 8.5 7v9.1a1.7 1.7 0 0 1-1.7 1.7H5.2a1.7 1.7 0 0 1-1.7-1.7Z" /><path d="M9.2 21.5v-6.3h5.6v6.3" /></svg>; }
+function PipelineIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2" /><circle cx="19" cy="6" r="2" /><circle cx="12" cy="18" r="2" /><path d="M7 6h10M5 8v5.2a2 2 0 0 0 2 2h3M19 8v5.2a2 2 0 0 1-2 2h-3" /></svg>; }
 
 function Metric({ id, label, value, detail, icon, tone = "violet", children }: { id?: string; label: string; value: string | number; detail?: string; icon: string; tone?: string; children?: ReactNode }) {
   return <article id={id} className="metric"><span className={"metric-icon " + tone}>{icon}</span><p>{label}</p><strong>{value}</strong>{detail && <small>{detail}</small>}{children}</article>;
@@ -90,7 +92,7 @@ function App() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
-  const [navigationExpanded, setNavigationExpanded] = useState(false);
+  const [page, setPage] = useState<"overview" | "pipeline">(() => window.location.hash === "#pipeline" ? "pipeline" : "overview");
   // Device|app whose default date range has been applied; the report waits for it.
   const [rangeKey, setRangeKey] = useState("");
   const hasAppliedDefaultSelection = useRef(false);
@@ -102,12 +104,12 @@ function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("behavior-theme", theme); }, [theme]);
   useEffect(() => {
-    if (!navigationExpanded) return;
-    const collapseNavigation = () => setNavigationExpanded(false);
-    window.addEventListener("scroll", collapseNavigation, { passive: true });
-    return () => window.removeEventListener("scroll", collapseNavigation);
-  }, [navigationExpanded]);
+    const updatePage = () => setPage(window.location.hash === "#pipeline" ? "pipeline" : "overview");
+    window.addEventListener("hashchange", updatePage);
+    return () => window.removeEventListener("hashchange", updatePage);
+  }, []);
   useEffect(() => {
+    if (page === "pipeline") { setOptionsLoading(false); return; }
     let cancelled = false;
     const selectionKey = filters.deviceId + "|" + filters.app;
     setRangeKey("");
@@ -133,7 +135,7 @@ function App() {
       .catch(() => { if (!cancelled) setRangeKey(selectionKey); })
       .finally(() => { if (!cancelled) setOptionsLoading(false); });
     return () => { cancelled = true; };
-  }, [filters.deviceId, filters.app]);
+  }, [filters.deviceId, filters.app, page]);
   useEffect(() => {
     if (!optionsLoading && filters.app && !filterOptions.apps.includes(filters.app)) {
       update("app", "");
@@ -141,11 +143,11 @@ function App() {
   }, [optionsLoading, filterOptions.apps, filters.app]);
   useEffect(() => {
     // Wait for this selection's date range, so a switch costs one dashboard request.
-    if (filters.deviceId && filters.app && rangeKey === filters.deviceId + "|" + filters.app) {
+    if (page === "overview" && filters.deviceId && filters.app && rangeKey === filters.deviceId + "|" + filters.app) {
       submit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.deviceId, filters.app, filters.from, filters.to, filters.granularity, rangeKey]);
+  }, [filters.deviceId, filters.app, filters.from, filters.to, filters.granularity, page, rangeKey]);
   function toggleTheme() { setSparkle(true); setTheme((current) => current === "dark" ? "light" : "dark"); window.setTimeout(() => setSparkle(false), 520); }
   async function submit(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -176,9 +178,9 @@ function App() {
   }
 
   return <TooltipProvider delay={150}><div className="shell">
-    <aside className="sidebar"><a className="brand" href="#top"><b>U</b> Usage<span>OS</span></a><nav aria-label="Dashboard navigation"><a className="selected" href="#overview">▦ Overview</a><a href="#activity">⌁ Activity</a><a href="#session">◷ Sessions</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
-    <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>Usage overview</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
-      <section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
+    <aside className="sidebar"><a className="brand" href="#overview"><b>U</b> Usage<span>OS</span></a><nav aria-label="Dashboard navigation"><a className={page === "overview" ? "selected" : ""} href="#overview">▦ Overview</a><a className={page === "pipeline" ? "selected" : ""} href="#pipeline">⌘ Pipeline</a></nav><p className="connection"><i /> Analytics API connected</p></aside>
+    <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>{page === "pipeline" ? "Data pipeline" : "Usage overview"}</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
+      {page === "pipeline" ? <Pipeline /> : <><section className="filters" aria-labelledby="filter-title"><div className="filter-intro"><p className="eyebrow">Explore activity</p><h2 id="filter-title">Refine your view</h2><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <FilterMenu loading={optionsLoading} fields={[
           { item: "Device", value: filters.deviceId, placeholder: "Choose a device", tooltip: "Select a device", options: filterOptions.deviceIds, onChange: (value) => update("deviceId", value) },
           { item: "App", value: filters.app, placeholder: "Choose an app", tooltip: "Select an app", options: appsWithTopFirst(filterOptions.apps, data?.topApps), icons: filterOptions.appIcons, onChange: (value) => update("app", value) }
@@ -194,12 +196,16 @@ function App() {
         <div className="metrics"><Metric label="Total Time Tracked" value={data ? duration(total) : "—"} detail={data ? rangeLabel : "Load a report to begin"} icon="◷"><div className="metric-secondary"><p>Time Tracked [ past week ]</p><strong>{data ? duration(data.pastWeekMilliseconds) : "—"}</strong></div></Metric><Metric id="session" label="Longest Session [ past week ]" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
       </section>
 
-    </main>
+      </>}</main>
     <nav className="glass-nav" aria-label="Primary navigation">
-      <button type="button" className={"glass-nav__home " + (navigationExpanded ? "is-expanded" : "")} aria-expanded={navigationExpanded} aria-label={navigationExpanded ? "Collapse Home navigation" : "Expand Home navigation"} onClick={() => setNavigationExpanded((current) => !current)}>
+      <a className={"glass-nav__link " + (page === "overview" ? "is-current" : "")} href="#overview" aria-label="Usage overview">
         <span className="glass-nav__icon"><HomeIcon /></span>
         <span className="glass-nav__label">Home</span>
-      </button>
+      </a>
+      <a className={"glass-nav__link " + (page === "pipeline" ? "is-current" : "")} href="#pipeline" aria-label="Data pipeline">
+        <span className="glass-nav__icon"><PipelineIcon /></span>
+        <span className="glass-nav__label">Pipeline</span>
+      </a>
     </nav>
   </div></TooltipProvider>;
 }
