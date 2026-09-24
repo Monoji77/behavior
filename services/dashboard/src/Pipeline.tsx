@@ -157,6 +157,10 @@ function Wires({ wires, branchWires, selectedId }: { wires: Wire[]; branchWires:
 // A live event's logo gliding through the pipeline; pulses each stage it reaches.
 function LiveToken({ event, arch, onDone }: { event: LiveEvent; arch: HTMLElement; onDone: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Keep the latest callback without restarting the flight: a new event re-renders
+  // every token with a fresh onDone, which must not reset tokens already in flight.
+  const done = useRef(onDone);
+  done.current = onDone;
   useEffect(() => {
     const token = ref.current;
     if (!token) return;
@@ -167,8 +171,8 @@ function LiveToken({ event, arch, onDone }: { event: LiveEvent; arch: HTMLElemen
     };
     const paths = [...arch.querySelectorAll<SVGPathElement>("path.arch-wire")];
     pulse(flow[0].from);
-    return flyToken(paths, token, (wire) => pulse(flow[wire].to), onDone);
-  }, [arch, onDone]);
+    return flyToken(paths, token, (wire) => pulse(flow[wire].to), () => done.current());
+  }, [arch]);
   return <div ref={ref} className={`arch-token arch-token--${event.kind.toLowerCase()}`} aria-hidden="true">
     <span className="arch-token__bubble">{event.app ? <AppIcon app={event.app} url={event.iconUrl} size={26} /> : <i />}</span>
     <em>{event.kind}</em>
