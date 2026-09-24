@@ -18,6 +18,10 @@ const steps: PipelineStep[] = [
   { id: "dashboard", label: "See", title: "Your dashboard", detail: "The report turns the processed events into the usage patterns, sessions, and trends you are exploring now.", event: "your insights", kind: "dashboard", tier: "client" }
 ];
 
+// Side branch, not a numbered step: where the stream processor parks events it can't handle.
+const deadLetter: PipelineStep = { id: "dlq", label: "Park", title: "Dead-letter topic", detail: "When the stream processor can't handle an event, it retries twice, then publishes it to the Kafka topic app-usage-events.dlq.v1 for inspection instead of losing it. Valid events keep flowing.", event: "failed events", kind: "broker", tier: "backend", lane: "write" };
+const stages = [...steps, deadLetter];
+
 const tiers: Record<Tier, { name: string; role: string }> = {
   source: { name: "Source", role: "Where events originate" },
   backend: { name: "Backend", role: "Services that ingest, process and serve" },
@@ -34,12 +38,13 @@ const art: Record<string, ReactNode> = {
   transform: <WorkerArt />,
   store: <DatabaseArt />,
   serve: <ApiCloudArt variant="serve" />,
-  dashboard: <DashboardArt />
+  dashboard: <DashboardArt />,
+  dlq: <KafkaArt />
 };
 
 function Node({ step, selectedId, onSelect, register }: { step: PipelineStep; selectedId: string; onSelect: (id: string) => void; register: (id: string, element: HTMLElement | null) => void }) {
-  return <button type="button" className={`pipeline-node pipeline-node--${step.kind} arch-node arch-node--${step.tier} ${selectedId === step.id ? "is-selected" : ""}`} data-step={step.id} aria-pressed={selectedId === step.id} onClick={() => onSelect(step.id)}>
-    <span className="arch-node__step" aria-label={`Step ${steps.indexOf(step) + 1}`}>{steps.indexOf(step) + 1}</span>
+  return <button type="button" className={`pipeline-node pipeline-node--${step.kind} arch-node arch-node--${step.tier} arch-node--${step.id} ${selectedId === step.id ? "is-selected" : ""}`} data-step={step.id} aria-pressed={selectedId === step.id} onClick={() => onSelect(step.id)}>
+    {steps.includes(step) && <span className="arch-node__step" aria-label={`Step ${steps.indexOf(step) + 1}`}>{steps.indexOf(step) + 1}</span>}
     <span className="pipeline-node__visual" ref={(element) => register(step.id, element)} aria-hidden="true">{art[step.id]}</span>
     <span className="pipeline-node__label">{step.label}</span>
     <strong>{step.title}</strong>
@@ -53,6 +58,7 @@ function GroupHeader({ tier, lane, role }: { tier: Tier; lane?: string; role?: s
 
 type Wire = { from: string; to: string; d: string; start: [number, number]; end: [number, number] };
 const flow = steps.slice(1).map((step, index) => ({ from: steps[index].id, to: step.id }));
+const branches = [{ from: "transform", to: "dlq" }];
 
 // A curve from one illustration's edge to the next: horizontal between neighbours
 // in a row, vertical between tiers. Recomputed from the live layout.
@@ -112,8 +118,8 @@ function toWire(r: Route): Wire {
   return { from: r.from, to: r.to, start, end, d: `M${start} C${start[0]},${start[1] + k} ${lineEnd[0]},${lineEnd[1] - k} ${lineEnd}` };
 }
 
-function Wires({ wires, selectedId }: { wires: Wire[]; selectedId: string }) {
-  const tierOf = (id: string) => steps.find((step) => step.id === id)!.tier;
+function Wires({ wires, branchWires, selectedId }: { wires: Wire[]; branchWires: Wire[]; selectedId: string }) {
+  const tierOf = (id: string) => stages.find((step) => step.id === id)!.tier;
   const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const cycle = wires.length * 1.3;
   return <svg className="arch-wires" aria-hidden="true">
@@ -124,6 +130,8 @@ function Wires({ wires, selectedId }: { wires: Wire[]; selectedId: string }) {
         <stop offset="1" style={{ stopColor: `var(--tier-${tierOf(wire.to)})` }} />
       </linearGradient>)}
     </defs>
+    <marker id="wire-head-dlq" viewBox="0 0 10 10" refX="0" refY="5" markerUnits="userSpaceOnUse" markerWidth={ARROW} markerHeight={ARROW} orient="auto"><path d="M0,1 L10,5 L0,9 Z" style={{ fill: "var(--rose)" }} /></marker>
+    {branchWires.map((wire, index) => <path key={`branch-${index}`} d={wire.d} className={`arch-branch ${[wire.from, wire.to].includes(selectedId) ? "is-active" : ""}`} markerEnd="url(#wire-head-dlq)" />)}
     {wires.map((wire, index) => <path key={index} id={`wire-${index}`} d={wire.d} className={`arch-wire ${[wire.from, wire.to].includes(selectedId) ? "is-active" : ""}`} stroke={`url(#wire-paint-${index})`} markerEnd={`url(#wire-head-${tierOf(wire.to)})`} />)}
     {!reduceMotion && wires.map((wire, index) => {
       // One event travels the whole chain: each wire's dot runs only during its slot.
@@ -159,11 +167,12 @@ function LiveToken({ event, arch, onDone }: { event: LiveEvent; arch: HTMLElemen
 
 export function Pipeline() {
   const [selectedId, setSelectedId] = useState(steps[0].id);
-  const selected = steps.find((step) => step.id === selectedId) ?? steps[0];
-  const step = (id: string) => steps.find((candidate) => candidate.id === id)!;
+  const selected = stages.find((step) => step.id === selectedId) ?? steps[0];
+  const step = (id: string) => stages.find((candidate) => candidate.id === id)!;
   const archRef = useRef<HTMLElement>(null);
   const visuals = useRef(new Map<string, HTMLElement>());
   const [wires, setWires] = useState<Wire[]>([]);
+  const [branchWires, setBranchWires] = useState<Wire[]>([]);
   const register = useCallback((id: string, element: HTMLElement | null) => { if (element) visuals.current.set(id, element); else visuals.current.delete(id); }, []);
   const node = (id: string) => <Node step={step(id)} selectedId={selectedId} onSelect={setSelectedId} register={register} />;
   const [tokens, setTokens] = useState<{ id: number; event: LiveEvent }[]>([]);
@@ -191,9 +200,12 @@ export function Pipeline() {
       const relative = (r: DOMRect) => new DOMRect(r.left - base.left, r.top - base.top, r.width, r.height);
       const rect = (id: string) => relative(visuals.current.get(id)!.getBoundingClientRect());
       const nodeRect = (id: string) => relative((visuals.current.get(id)!.closest(".arch-node") ?? visuals.current.get(id)!).getBoundingClientRect());
-      const routes = flow.filter(({ from, to }) => visuals.current.has(from) && visuals.current.has(to)).map(({ from, to }) => route(from, to, rect(from), rect(to), nodeRect(from), nodeRect(to)));
-      spreadSharedAnchors(routes);
+      const present = ({ from, to }: { from: string; to: string }) => visuals.current.has(from) && visuals.current.has(to);
+      const routes = flow.filter(present).map(({ from, to }) => route(from, to, rect(from), rect(to), nodeRect(from), nodeRect(to)));
+      const branchRoutes = branches.filter(present).map(({ from, to }) => route(from, to, rect(from), rect(to), nodeRect(from), nodeRect(to)));
+      spreadSharedAnchors([...routes, ...branchRoutes]);
       setWires(routes.map(toWire));
+      setBranchWires(branchRoutes.map(toWire));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -207,7 +219,7 @@ export function Pipeline() {
     </header>
 
     <section className="arch" ref={archRef} aria-label="Usage data architecture">
-      <Wires wires={wires} selectedId={selectedId} />
+      <Wires wires={wires} branchWires={branchWires} selectedId={selectedId} />
       {archRef.current && tokens.map((token) => <LiveToken key={token.id} event={token.event} arch={archRef.current!} onDone={() => removeToken(token.id)} />)}
       <section className="arch-group arch-group--source" style={{ gridArea: "source" }} aria-label="Source"><GroupHeader tier="source" />{node("capture")}</section>
       <section className="arch-group arch-group--client" style={{ gridArea: "client" }} aria-label="Client"><GroupHeader tier="client" />{node("dashboard")}</section>
@@ -216,7 +228,7 @@ export function Pipeline() {
         <div className="arch-lane arch-lane--write" aria-label="Backend write path">
           <span className="arch-lane__label">Write path</span>
           <GroupHeader tier="backend" lane="write path" role="Ingest and process events" />
-          {node("ingest")}{node("stream")}{node("transform")}
+          {node("ingest")}{node("stream")}{node("transform")}{node("dlq")}
         </div>
         <div className="arch-lane arch-lane--read" aria-label="Backend read path">
           <span className="arch-lane__label">Read path</span>
@@ -228,15 +240,10 @@ export function Pipeline() {
     </section>
 
     <section className="pipeline-inspector" aria-live="polite" aria-label="Selected pipeline stage">
-      <span className="pipeline-inspector__number">{String(steps.indexOf(selected) + 1).padStart(2, "0")}</span>
+      <span className="pipeline-inspector__number">{steps.includes(selected) ? String(steps.indexOf(selected) + 1).padStart(2, "0") : "!"}</span>
       <div><p className="eyebrow">{tierLabel(selected)} · {selected.label}</p><h2>{selected.title}</h2><p>{selected.detail}</p></div>
       <span className="pipeline-inspector__event">{selected.event}</span>
     </section>
 
-    <aside className="pipeline-dlq" aria-label="Failure handling">
-      <span className="pipeline-dlq__path" aria-hidden="true"><i /></span>
-      <span className="pipeline-dlq__icon" aria-hidden="true">!</span>
-      <div><p className="eyebrow">Safe failure path · Backend</p><h2>Dead-letter topic</h2><p>Events the stream processor cannot handle are parked in a Kafka dead-letter topic for inspection instead of being silently lost. Valid events keep flowing to the dashboard.</p></div>
-    </aside>
   </section>;
 }

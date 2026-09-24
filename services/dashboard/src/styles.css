@@ -108,13 +108,9 @@
 .pipeline-node small{color:var(--faint);font-size:.66rem;line-height:1.35}
 .pipeline-inspector{align-items:center;background:color-mix(in srgb,var(--accent) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--accent) 28%,var(--line));border-radius:1rem;display:grid;gap:1rem;grid-template-columns:auto minmax(0,1fr) auto;padding:1.1rem 1.25rem}
 .pipeline-inspector__number{color:var(--accent-bright);font-size:1.7rem;font-weight:850;letter-spacing:-.08em}
-.pipeline-inspector h2,.pipeline-dlq h2{margin-top:.18rem}
-.pipeline-inspector p:last-child,.pipeline-dlq p:last-child{color:var(--muted);font-size:.82rem;line-height:1.55;margin-top:.38rem}
+.pipeline-inspector h2{margin-top:.18rem}
+.pipeline-inspector p:last-child{color:var(--muted);font-size:.82rem;line-height:1.55;margin-top:.38rem}
 .pipeline-inspector__event{background:var(--accent-soft);border-radius:999px;color:var(--accent-bright);font-size:.7rem;font-weight:750;padding:.42rem .65rem;text-align:center}
-.pipeline-dlq{align-items:center;background:color-mix(in srgb,var(--rose) 9%,var(--panel));border:1px solid color-mix(in srgb,var(--rose) 36%,var(--line));border-radius:1rem;display:grid;gap:1rem;grid-template-columns:auto auto minmax(0,1fr);padding:1rem 1.25rem;position:relative}
-.pipeline-dlq__path{background:color-mix(in srgb,var(--rose) 45%,var(--line));height:2px;overflow:hidden;position:relative;width:3.5rem}
-.pipeline-dlq__path i{animation:pipeline-pulse 1.7s ease-in-out infinite;background:var(--rose);border-radius:50%;height:.42rem;left:0;position:absolute;top:50%;transform:translate(-100%,-50%);width:.42rem}
-.pipeline-dlq__icon{align-items:center;background:color-mix(in srgb,var(--rose) 18%,transparent);border-radius:50%;color:var(--rose);display:inline-flex;font-size:1rem;font-weight:850;height:2.35rem;justify-content:center;width:2.35rem}
 @keyframes pipeline-pulse{0%{left:0;opacity:0;transform:translate(-100%,-50%) scale(.65)}18%{opacity:1}82%{opacity:1}100%{left:100%;opacity:0;transform:translate(0,-50%) scale(1)}}
 @keyframes pipeline-pulse-vertical{0%{opacity:0;top:0;transform:translate(-50%,-100%) scale(.65)}18%{opacity:1}82%{opacity:1}100%{opacity:0;top:100%;transform:translate(-50%,0) scale(1)}}
 @keyframes pipeline-orbit{0%{opacity:.9;transform:scale(.7)}100%{opacity:0;transform:scale(1.35)}}
@@ -145,14 +141,11 @@
   .pipeline-node small{grid-column:2}
   .pipeline-inspector{align-items:start;grid-template-columns:auto minmax(0,1fr)}
   .pipeline-inspector__event{grid-column:2;justify-self:start}
-  .pipeline-dlq{align-items:start;grid-template-columns:auto minmax(0,1fr)}
-  .pipeline-dlq__path{display:none}
-  .pipeline-dlq>div{grid-column:2}
 }
 
 @media(prefers-reduced-motion:reduce){
   .glass-nav__link,.glass-nav__icon,.pipeline-node{transition:none}
-  .pipeline-node.is-selected .pipeline-node__orb::before,.pipeline-dlq__path i,.pipeline-node__label{animation:none}
+  .pipeline-node.is-selected .pipeline-node__orb::before,.pipeline-node__label{animation:none}
 }
 
 /* Moving highlight inspired by the animated-gradient-text treatment. */
@@ -228,7 +221,7 @@
 .arch{--tier-source:#38bdf8;--tier-backend:var(--accent-bright);--tier-database:#f59e0b;--tier-client:#34d399;grid-template-areas:"source" "write" "database" "read" "client";position:relative;row-gap:2.6rem}
 .arch-group--source{--tier:var(--tier-source)}.arch-group--backend,.arch-lane{--tier:var(--tier-backend)}.arch-group--database{--tier:var(--tier-database)}.arch-group--client{--tier:var(--tier-client)}
 .arch-group,.arch-lane{background:none;border:0}
-.arch-group::before,.arch-lane::before{background:radial-gradient(ellipse at 50% 60%,color-mix(in srgb,var(--tier) 24%,transparent),transparent 70%),color-mix(in srgb,var(--tier) 6%,transparent);border:1px solid color-mix(in srgb,var(--tier) 30%,transparent);border-radius:2.2rem;bottom:0;box-shadow:0 0 40px color-mix(in srgb,var(--tier) 10%,transparent) inset;content:"";height:100%;left:0;pointer-events:none;position:absolute;right:0;transform:perspective(1200px) rotateX(34deg);transform-origin:50% 100%;z-index:0}
+.arch-group::before,.arch-lane::before{background:radial-gradient(ellipse at 50% 60%,color-mix(in srgb,var(--tier) 24%,transparent),transparent 70%),color-mix(in srgb,var(--tier) 6%,transparent);border:1px solid color-mix(in srgb,var(--tier) 30%,transparent);border-radius:2.2rem;bottom:0;box-shadow:0 0 40px color-mix(in srgb,var(--tier) 10%,transparent) inset;content:"";height:100%;left:0;pointer-events:none;position:absolute;right:0;transform:perspective(1400px) rotateX(20deg);transform-origin:50% 100%;z-index:0}
 .arch-group--backend::before{display:none}
 .arch-group__header,.arch-lane__label{position:relative;z-index:2}
 .arch-group__header{gap:0;justify-items:start}.arch-group__header span,.arch-group__header small{background:var(--bg);border-radius:.4rem;margin-left:-.35rem;padding:.04rem .35rem}
@@ -305,3 +298,12 @@
 .menu-option__rank--2nd{background:#d1d5db}
 .menu-option__rank--3rd{background:#d9894a}
 
+/* Dead-letter branch: a small red log under Kafka, fed by a dashed wire from the stream processor. */
+.arch-node--dlq{--tier:var(--rose)}
+.arch .arch-node--dlq .pipeline-node__visual,.arch .arch-node--dlq.is-selected .pipeline-node__visual{height:4.6rem;width:5.2rem}
+.arch-node--dlq .pipeline-node__label{color:var(--rose)}
+.arch-branch{fill:none;opacity:.75;stroke:var(--rose);stroke-dasharray:5 5;stroke-linecap:round;stroke-width:2}
+.arch-branch.is-active{opacity:1;stroke-width:2.6}
+.arch-lane--write .arch-node--dlq{justify-self:end;width:auto}
+@media (min-width:1100px){.arch-lane--write .arch-node--dlq{grid-column:2;grid-row:3;justify-self:center;margin-top:1.6rem}}
+@media (min-width:1100px){.arch-lane--read{align-content:start}}
