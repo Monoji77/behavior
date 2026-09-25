@@ -48,6 +48,18 @@ export interface TopApp {
   iconUrl: string | null;
 }
 
+export interface CategoryUsage {
+  category: string;
+  usageMilliseconds: number;
+  appCount: number;
+}
+
+export interface BehaviorSummary {
+  totalUsageMilliseconds: number;
+  appCount: number;
+  categories: CategoryUsage[];
+}
+
 // App menu order: the week's top apps first (most used first), then the rest alphabetically.
 export function appsWithTopFirst(apps: string[], topApps: TopApp[] | undefined): string[] {
   const top = (topApps ?? []).map((entry) => entry.app).filter((app) => apps.includes(app));
@@ -107,7 +119,9 @@ export type DefaultSelection = { deviceId?: string; app?: string; done: boolean 
 // Never replaces something already chosen.
 export function defaultSelection(deviceId: string, app: string, options: FilterOptions): DefaultSelection {
   if (!deviceId) {
-    const device = options.deviceIds[0];
+    // This dashboard belongs to Chris's phone; retain a sensible fallback when
+    // other devices are later connected.
+    const device = options.deviceIds.find((item) => item === "iPhone 16 Pro") ?? options.deviceIds[0];
     return device ? { deviceId: device, done: false } : { done: true };
   }
   return !app && options.topApp ? { app: options.topApp, done: true } : { done: true };
@@ -160,6 +174,15 @@ export function filterOptionsUrl(deviceId?: string, app?: string): string {
 
 export function loadFilterOptions(deviceId?: string, app?: string): Promise<FilterOptions> {
   return getJson<FilterOptions>(filterOptionsUrl(deviceId, app));
+}
+
+export function behaviorSummaryUrl(deviceId: string, from: string, to: string): string {
+  const search = new URLSearchParams({ deviceId, from: new Date(from).toISOString(), to: new Date(to).toISOString() });
+  return `/api/v1/metrics/behavior-summary?${search.toString()}`;
+}
+
+export function loadBehaviorSummary(deviceId: string, from: string, to: string, signal?: AbortSignal): Promise<BehaviorSummary> {
+  return getJson<BehaviorSummary>(behaviorSummaryUrl(deviceId, from, to), signal);
 }
 
 const RATE_LIMIT_RETRY_MILLISECONDS = 1500;
