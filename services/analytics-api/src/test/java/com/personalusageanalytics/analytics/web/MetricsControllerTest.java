@@ -2,6 +2,7 @@ package com.personalusageanalytics.analytics.web;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,7 +25,9 @@ import com.personalusageanalytics.analytics.model.BehaviorCategory;
 import com.personalusageanalytics.analytics.persistence.AnalyticsRepository;
 import com.personalusageanalytics.analytics.model.AnomalyCount;
 import com.personalusageanalytics.analytics.service.AppCategoryClassifier;
+import com.personalusageanalytics.analytics.service.AppTrackingPolicy;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -42,6 +45,14 @@ class MetricsControllerTest {
 
         @MockitoBean
         private AppCategoryClassifier appCategoryClassifier;
+
+        @MockitoBean
+        private AppTrackingPolicy appTrackingPolicy;
+
+        @BeforeEach
+        void trackAppsByDefault() {
+                when(appTrackingPolicy.isTracked(anyString())).thenReturn(true);
+        }
 
         @Test
         void groupsAllAppUsageIntoNaturalBehaviorCategories() throws Exception {
@@ -66,6 +77,17 @@ class MetricsControllerTest {
                                 .andExpect(jsonPath("$.categories[0].usageMilliseconds").value(70_000))
                                 .andExpect(jsonPath("$.categories[0].appCount").value(2))
                                 .andExpect(jsonPath("$.categories[1].category").value("Communication"));
+        }
+
+        @Test
+        void hidesExcludedAppsFromMetricEndpoints() throws Exception {
+                when(appTrackingPolicy.isTracked("Grindr")).thenReturn(false);
+
+                mockMvc.perform(get("/api/v1/metrics")
+                                .param("metricName", "latest-session")
+                                .param("deviceId", "iPhone 16 Pro")
+                                .param("app", "Grindr"))
+                                .andExpect(status().isNotFound());
         }
 
         @Test
