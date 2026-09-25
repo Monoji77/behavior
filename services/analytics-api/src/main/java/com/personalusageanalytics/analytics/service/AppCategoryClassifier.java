@@ -9,17 +9,24 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class AppCategoryClassifier {
+    // A one-character app name must be an exact match, not a substring match.
+    private static final Map<String, BehaviorCategory> EXACT_APP_CATEGORIES = Map.of(
+            "x", BehaviorCategory.SOCIAL_AND_ENTERTAINMENT);
     private static final Map<BehaviorCategory, Set<String>> KEYWORDS = Map.of(
             BehaviorCategory.SOCIAL_AND_ENTERTAINMENT, Set.of("instagram", "tiktok", "youtube", "netflix", "spotify", "reddit", "facebook", "twitter", "snapchat", "twitch", "pinterest", "disney", "hulu", "primevideo", "music", "game"),
             BehaviorCategory.COMMUNICATION, Set.of("whatsapp", "telegram", "signal", "messenger", "imessage", "messages", "gmail", "outlook", "mail", "phone", "facetime"),
-            BehaviorCategory.WORK_AND_PRODUCTIVITY, Set.of("slack", "tinyspeck", "teams", "notion", "calendar", "docs", "sheets", "drive", "word", "excel", "powerpoint", "zoom", "todoist", "asana", "trello"),
-            BehaviorCategory.FINANCE_AND_SHOPPING, Set.of("bank", "wallet", "paypal", "revolut", "shopee", "amazon", "lazada", "ebay", "grab", "uber"),
+            BehaviorCategory.WORK_AND_PRODUCTIVITY, Set.of("slack", "tinyspeck", "teams", "notion", "calendar", "docs", "sheets", "drive", "word", "excel", "powerpoint", "zoom", "todoist", "asana", "trello", "authenticator", "singpass", "github", "discord"),
+            BehaviorCategory.FINANCE_AND_SHOPPING, Set.of("bank", "wallet", "paypal", "revolut", "shopee", "amazon", "lazada", "ebay", "grab", "uber", "googlepay", "singaporeair", "dbspaylah"),
             BehaviorCategory.HEALTH_AND_LIFESTYLE, Set.of("health", "fitness", "strava", "fitbit", "calm", "headspace", "myfitnesspal", "foodpanda", "deliveroo"),
             BehaviorCategory.LEARNING, Set.of("kindle", "duolingo", "coursera", "udemy", "khan", "quizlet", "canvas"),
-            BehaviorCategory.UTILITIES_AND_NAVIGATION, Set.of("maps", "waze", "settings", "camera", "safari", "chrome", "browser", "weather", "clock", "photos", "files"));
+            BehaviorCategory.UTILITIES_AND_NAVIGATION, Set.of("maps", "waze", "settings", "camera", "safari", "chrome", "browser", "weather", "clock", "photos", "files", "helloride", "anywheel"));
 
     public BehaviorCategory classify(String app) {
         String normalized = app == null ? "" : app.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
-        return KEYWORDS.entrySet().stream().filter(entry -> entry.getValue().stream().anyMatch(normalized::contains)).map(Map.Entry::getKey).findFirst().orElse(BehaviorCategory.OTHER);
+        return EXACT_APP_CATEGORIES.getOrDefault(normalized, KEYWORDS.entrySet().stream()
+                .filter(entry -> entry.getValue().stream().anyMatch(normalized::contains))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(BehaviorCategory.OTHER));
     }
 }
