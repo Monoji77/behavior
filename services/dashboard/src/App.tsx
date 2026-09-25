@@ -6,7 +6,7 @@ import { AppIcon } from "./AppIcon";
 import { formatDuration } from "./format";
 import { FilterMenu } from "./FilterMenu";
 import { LinkPreview } from "./LinkPreview";
-import { type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, appsWithTopFirst, defaultDateRange, defaultSelection, fillUsageBuckets, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
+import { type BehaviorSummary, type DashboardData, type Filters, type Granularity, type FilterOptions, DashboardApiError, appsWithTopFirst, defaultDateRange, defaultSelection, fillUsageBuckets, loadBehaviorSummary, loadDashboard, loadFilterOptions, selectedAppRank } from "./api";
 import { DateRangeChip } from "./DateRangeChip";
 import { GranularitySelect } from "./GranularitySelect";
 import { RefreshButton, type RefreshStatus } from "./RefreshButton";
@@ -83,9 +83,17 @@ function Trend({ rollups, from, to, granularity }: { rollups: DashboardData["rol
   </div>;
 }
 
+function DailySummary({ summary }: { summary: BehaviorSummary | null }) {
+  if (!summary) return <div className="chart-empty">Your daily behavior summary will appear once a device is selected.</div>;
+  if (!summary.categories.length) return <div className="chart-empty">No activity was recorded today.</div>;
+  const maximum = Math.max(...summary.categories.map((category) => category.usageMilliseconds), 1);
+  return <div style={{ display: "grid", gap: "1rem", marginTop: "1.25rem" }}>{summary.categories.map((category) => <div key={category.category} style={{ alignItems: "center", display: "grid", gap: "0.8rem", gridTemplateColumns: "minmax(130px, 1fr) minmax(100px, 3fr) auto" }}><div><strong>{category.category}</strong><small style={{ display: "block", marginTop: "0.2rem" }}>{category.appCount} {category.appCount === 1 ? "app" : "apps"}</small></div><div style={{ background: "var(--line)", borderRadius: "999px", height: "0.55rem", overflow: "hidden" }}><i style={{ background: "var(--accent-bright)", borderRadius: "inherit", display: "block", height: "100%", width: `${(category.usageMilliseconds / maximum) * 100}%` }} /></div><strong>{duration(category.usageMilliseconds)}</strong></div>)}</div>;
+}
+
 function App() {
   const [filters, setFilters] = useState<Filters>({ deviceId: "", app: "", granularity: "HOUR", ...initialRange });
   const [data, setData] = useState<DashboardData | null>(null);
+  const [behavior, setBehavior] = useState<BehaviorSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({ deviceIds: [], apps: [], earliestUsageAt: null, availableDates: [], topApp: null, appIcons: {} });
@@ -95,8 +103,10 @@ function App() {
   const toggleSidebar = () => setSidebarCollapsed((current) => { try { localStorage.setItem("behavior-sidebar", current ? "expanded" : "collapsed"); } catch { /* storage unavailable */ } return !current; });
   const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("behavior-theme") === "light" ? "light" : "dark");
   const [sparkle, setSparkle] = useState(false);
-  // Pipeline is the landing page; the dashboard lives at #overview.
+  // Pipeline is the landing page; Dashboard lives at #overview.
   const [page, setPage] = useState<"overview" | "pipeline">(() => window.location.hash === "#overview" ? "overview" : "pipeline");
+  // The two summary modes are views inside Dashboard, not separate primary navigation items.
+  const [dashboardView, setDashboardView] = useState<"daily" | "apps">("daily");
   // Mobile glass nav: collapses to the current page's icon after any scroll, except
   // when the scroll reaches the very bottom of the page, where it opens back up.
   const [navExpanded, setNavExpanded] = useState(false);
@@ -162,14 +172,32 @@ function App() {
   }, [optionsLoading, filterOptions.apps, filters.app]);
   useEffect(() => {
     // Wait for this selection's date range, so a switch costs one dashboard request.
-    if (page === "overview" && filters.deviceId && filters.app && rangeKey === filters.deviceId + "|" + filters.app) {
+    if (page === "overview" && dashboardView === "apps" && filters.deviceId && filters.app && rangeKey === filters.deviceId + "|" + filters.app) {
       submit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.deviceId, filters.app, filters.from, filters.to, filters.granularity, page, rangeKey]);
+  }, [filters.deviceId, filters.app, filters.from, filters.to, filters.granularity, page, dashboardView, rangeKey]);
+  useEffect(() => {
+    if (page !== "overview" || dashboardView !== "daily" || !filters.deviceId) return;
+    const controller = new AbortController();
+    const today = isoDay(new Date());
+    setRefreshStatus("loading"); setError(null);
+    loadBehaviorSummary(filters.deviceId, today + "T00:00", today + "T23:59", controller.signal)
+      .then((next) => { if (!controller.signal.aborted) { setBehavior(next); setRefreshStatus("done"); } })
+      .catch((reason) => { if (!controller.signal.aborted) { setError(reason instanceof Error ? reason.message : "Unable to load the daily summary."); setRefreshStatus("error"); } })
+      .finally(() => { if (!controller.signal.aborted) window.setTimeout(() => setRefreshStatus("idle"), 1400); });
+    return () => controller.abort();
+  }, [page, dashboardView, filters.deviceId]);
   function toggleTheme() { setSparkle(true); setTheme((current) => current === "dark" ? "light" : "dark"); window.setTimeout(() => setSparkle(false), 520); }
   async function submit(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (page === "overview" && dashboardView === "daily") {
+      if (!filters.deviceId) { setBehavior(null); setError("Choose a device from the list."); return; }
+      const today = isoDay(new Date());
+      setRefreshStatus("loading"); setError(null);
+      try { setBehavior(await loadBehaviorSummary(filters.deviceId, today + "T00:00", today + "T23:59")); setRefreshStatus("done"); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load the daily summary."); setRefreshStatus("error"); } finally { window.setTimeout(() => setRefreshStatus("idle"), 1400); }
+      return;
+    }
     // The inputs' `required` only sees typed text, not a chosen option; never query with nothing selected.
     if (!filters.deviceId || !filters.app) { setData(null); setError("Choose a device and an app from the list."); return; }
     // Only the latest selection may update the page; cancel whatever it supersedes.
@@ -197,9 +225,9 @@ function App() {
   }
 
   return <TooltipProvider delay={150}><div className={`shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
-    <aside className="sidebar"><button type="button" className="brand" onClick={toggleSidebar} aria-expanded={!sidebarCollapsed} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h3.5l2.2-5.5 4.1 11 2.6-7.2 1.4 1.7H21" /></svg></span><span className="brand-text"><strong>Digital Habits</strong><small>by Chris Yong</small></span></button><nav aria-label="Dashboard navigation"><a className={page === "pipeline" ? "selected" : ""} href="#pipeline" title="Pipeline"><span className="nav-icon" aria-hidden="true">⌘</span><span className="nav-label">Pipeline</span></a><a className={page === "overview" ? "selected" : ""} href="#overview" title="Dashboard"><span className="nav-icon" aria-hidden="true">▦</span><span className="nav-label">Dashboard</span></a></nav><div className="sidebar-links"><LinkPreview image="/previews/github.jpg" title="Monoji77/behavior" address="github.com/Monoji77/behavior"><a className="portfolio-link" href="https://github.com/Monoji77/behavior/tree/main" target="_blank" rel="noopener noreferrer"><svg className="icon-filled" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg><span className="nav-label">Source on GitHub</span></a></LinkPreview><LinkPreview image="/previews/portfolio.jpg" title="Chris Yong · Portfolio" address="chrisyong-portfolio.com"><a className="portfolio-link" href="https://chrisyong-portfolio.com/" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11 3h6v6M17 3l-8 8M14 11v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg><span className="nav-label">My portfolio</span></a></LinkPreview></div></aside>
-    <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><h1>{page === "pipeline" ? "Data pipeline" : "Usage overview"}</h1></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
-      {page === "pipeline" ? <Pipeline /> : <><section className="filters" aria-label="Filters"><div className="filter-intro"><p className="eyebrow">Explore activity</p><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
+    <aside className="sidebar"><button type="button" className="brand" onClick={toggleSidebar} aria-expanded={!sidebarCollapsed} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h3.5l2.2-5.5 4.1 11 2.6-7.2 1.4 1.7H21" /></svg></span><span className="brand-text"><strong>Digital Habits</strong><small>by Chris Yong</small></span></button><nav aria-label="Primary navigation"><a className={page === "pipeline" ? "selected" : ""} href="#pipeline" title="Pipeline"><span className="nav-icon" aria-hidden="true">⌘</span><span className="nav-label">Pipeline</span></a><a className={page === "overview" ? "selected" : ""} href="#overview" title="Dashboard" onClick={() => setDashboardView("daily")}><span className="nav-icon" aria-hidden="true">▦</span><span className="nav-label">Dashboard</span></a></nav><div className="sidebar-links"><LinkPreview image="/previews/github.jpg" title="Monoji77/behavior" address="github.com/Monoji77/behavior"><a className="portfolio-link" href="https://github.com/Monoji77/behavior/tree/main" target="_blank" rel="noopener noreferrer"><svg className="icon-filled" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg><span className="nav-label">Source on GitHub</span></a></LinkPreview><LinkPreview image="/previews/portfolio.jpg" title="Chris Yong · Portfolio" address="chrisyong-portfolio.com"><a className="portfolio-link" href="https://chrisyong-portfolio.com/" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11 3h6v6M17 3l-8 8M14 11v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg><span className="nav-label">My portfolio</span></a></LinkPreview></div></aside>
+    <main id="top"><header className="topbar"><div><p className="eyebrow">Phone Behavior Analytics</p><div className="title-with-toggle"><h1>{page === "pipeline" ? "Data pipeline" : dashboardView === "daily" ? "Daily Summary" : "App Summary"}</h1>{page === "overview" && <div className="summary-toggle" role="tablist" aria-label="Dashboard views"><i className={"summary-toggle__indicator " + (dashboardView === "apps" ? "is-apps" : "")} aria-hidden="true" /><button type="button" role="tab" aria-selected={dashboardView === "daily"} onClick={() => setDashboardView("daily")}>Daily Summary</button><button type="button" role="tab" aria-selected={dashboardView === "apps"} onClick={() => setDashboardView("apps")}>App Summary</button></div>}</div></div><div className="live"><i /> Live data <button type="button" className={"theme-toggle " + (sparkle ? "sparkling" : "")} onClick={toggleTheme} aria-label={"Switch to " + (theme === "dark" ? "light" : "dark") + " mode"}><span className="theme-sun"><SunIcon /></span><span className="theme-moon"><MoonIcon /></span>{[0, 1, 2, 3, 4, 5].map((star) => <em key={star} className={"spark star-" + star}>✦</em>)}</button></div></header>
+      {page === "pipeline" ? <Pipeline /> : <div className={`dashboard-view dashboard-view--${dashboardView}`} key={dashboardView}>{dashboardView === "daily" ? <><section className="filters" aria-label="Daily summary filters"><div className="filter-intro"><p className="eyebrow">Today</p><p>Behavior across every app on this device.</p></div><form onSubmit={submit}><FilterMenu loading={optionsLoading} fields={[{ item: "Device", value: filters.deviceId, placeholder: "Choose a device", tooltip: "Select a device", options: filterOptions.deviceIds, onChange: (value) => update("deviceId", value) }]} /><RefreshButton status={refreshStatus} /></form></section>{error && <p className="error" role="alert">{error}</p>}<section className="dashboard-layout" aria-label="Daily behavior summary"><article className="panel report report-card"><div className="report-head"><p className="eyebrow">Today across all apps</p><h2>{behavior ? duration(behavior.totalUsageMilliseconds) : "—"}</h2><p>{behavior ? `${behavior.appCount} apps tracked` : "Choose a device to load today's summary"}</p></div><div className="report-range"><span>Top behavior</span><strong>{behavior?.categories[0]?.category ?? "—"}</strong></div></article><section className="panel trend-panel"><header><div><p className="eyebrow">Natural groups</p><h2>Where your time went</h2></div><span className="pill">Today</span></header><DailySummary summary={behavior} /></section></section></> : <><section className="filters" aria-label="Filters"><div className="filter-intro"><p className="eyebrow">Explore activity</p><p>Compare usage patterns and sessions.</p></div><form onSubmit={submit}>
         <FilterMenu loading={optionsLoading} fields={[
           { item: "Device", value: filters.deviceId, placeholder: "Choose a device", tooltip: "Select a device", options: filterOptions.deviceIds, onChange: (value) => update("deviceId", value) },
           { item: "App", value: filters.app, placeholder: "Choose an app", tooltip: "Select an app", options: appsWithTopFirst(filterOptions.apps, data?.topApps), icons: filterOptions.appIcons, ranks: appRanks, onChange: (value) => update("app", value) }
@@ -215,7 +243,7 @@ function App() {
         <div className="metrics"><Metric label="Total Time Tracked" value={data ? duration(total) : "—"} detail={data ? rangeLabel : "Load a report to begin"} icon="◷"><div className="metric-secondary"><p>Time Tracked [ past week ]</p><strong>{data ? duration(data.pastWeekMilliseconds) : "—"}</strong></div></Metric><Metric id="session" label="Longest Session [ past week ]" value={data ? duration(data.longestSession?.durationMilliseconds) : "—"} detail={data?.longestSession ? undefined : data ? "No session this week" : "Awaiting activity"} icon="▣" tone="amber">{data?.longestSession && <dl><div><dt>Opened At</dt><dd>{time(data.longestSession.openedAt)}</dd></div><div><dt>Closed At</dt><dd>{time(data.longestSession.closedAt)}</dd></div></dl>}</Metric></div>
       </section>
 
-      </>}</main>
+      </>}</div>}</main>
     <nav className={"glass-nav " + (navExpanded ? "is-expanded" : "is-collapsed")} aria-label="Primary navigation">
       {([["pipeline", "Pipeline", <PipelineIcon key="i" />, "#pipeline"], ["overview", "Dashboard", <HomeIcon key="i" />, "#overview"]] as const).map(([id, label, icon, href]) => {
         const isCurrent = page === id;
@@ -224,7 +252,7 @@ function App() {
           aria-hidden={hiddenWhileCollapsed} tabIndex={hiddenWhileCollapsed ? -1 : undefined}
           aria-expanded={isCurrent ? navExpanded : undefined}
           aria-label={!navExpanded && isCurrent ? `Show navigation, currently on ${label}` : label}
-          onClick={(event) => { if (!navExpanded) { event.preventDefault(); setNavExpanded(true); } }}>
+          onClick={(event) => { if (id === "overview") setDashboardView("daily"); if (!navExpanded) { event.preventDefault(); setNavExpanded(true); } }}>
           <span className="glass-nav__icon">{icon}</span>
           <span className={"glass-nav__label" + (navExpanded ? "" : " is-hidden")}>{label}</span>
         </a>;

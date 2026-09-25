@@ -19,8 +19,11 @@ import com.personalusageanalytics.analytics.model.RollupGranularity;
 import com.personalusageanalytics.analytics.model.UsageRollup;
 import com.personalusageanalytics.analytics.model.LatestSession;
 import com.personalusageanalytics.analytics.model.TopApp;
+import com.personalusageanalytics.analytics.model.AppUsageTotal;
+import com.personalusageanalytics.analytics.model.BehaviorCategory;
 import com.personalusageanalytics.analytics.persistence.AnalyticsRepository;
 import com.personalusageanalytics.analytics.model.AnomalyCount;
+import com.personalusageanalytics.analytics.service.AppCategoryClassifier;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +39,34 @@ class MetricsControllerTest {
 
         @MockitoBean
         private AnalyticsRepository analyticsRepository;
+
+        @MockitoBean
+        private AppCategoryClassifier appCategoryClassifier;
+
+        @Test
+        void groupsAllAppUsageIntoNaturalBehaviorCategories() throws Exception {
+                Instant from = Instant.parse("2026-09-25T00:00:00Z");
+                Instant to = Instant.parse("2026-09-26T00:00:00Z");
+                when(analyticsRepository.findAppUsageTotals("iPhone 16 Pro", from, to)).thenReturn(List.of(
+                                new AppUsageTotal("Instagram", 50_000L),
+                                new AppUsageTotal("Netflix", 20_000L),
+                                new AppUsageTotal("Telegram", 30_000L)));
+                when(appCategoryClassifier.classify("Instagram")).thenReturn(BehaviorCategory.SOCIAL_AND_ENTERTAINMENT);
+                when(appCategoryClassifier.classify("Netflix")).thenReturn(BehaviorCategory.SOCIAL_AND_ENTERTAINMENT);
+                when(appCategoryClassifier.classify("Telegram")).thenReturn(BehaviorCategory.COMMUNICATION);
+
+                mockMvc.perform(get("/api/v1/metrics/behavior-summary")
+                                .param("deviceId", "iPhone 16 Pro")
+                                .param("from", from.toString())
+                                .param("to", to.toString()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.totalUsageMilliseconds").value(100_000))
+                                .andExpect(jsonPath("$.appCount").value(3))
+                                .andExpect(jsonPath("$.categories[0].category").value("Social & Entertainment"))
+                                .andExpect(jsonPath("$.categories[0].usageMilliseconds").value(70_000))
+                                .andExpect(jsonPath("$.categories[0].appCount").value(2))
+                                .andExpect(jsonPath("$.categories[1].category").value("Communication"));
+        }
 
         @Test
         void returnsTheLatestSession() throws Exception {

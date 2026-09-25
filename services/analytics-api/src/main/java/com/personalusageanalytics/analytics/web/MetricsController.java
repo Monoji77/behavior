@@ -3,15 +3,21 @@ package com.personalusageanalytics.analytics.web;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
 import com.personalusageanalytics.analytics.model.AnomalyCount;
+import com.personalusageanalytics.analytics.model.AppUsageTotal;
+import com.personalusageanalytics.analytics.model.BehaviorCategory;
+import com.personalusageanalytics.analytics.model.CategoryUsage;
 import com.personalusageanalytics.analytics.model.LatestSession;
 import com.personalusageanalytics.analytics.model.RollupGranularity;
 import com.personalusageanalytics.analytics.model.TopApp;
 import com.personalusageanalytics.analytics.model.UsageRollup;
 import com.personalusageanalytics.analytics.persistence.AnalyticsRepository;
+import com.personalusageanalytics.analytics.service.AppCategoryClassifier;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -31,9 +37,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class MetricsController {
 
     private final AnalyticsRepository analyticsRepository;
+    private final AppCategoryClassifier appCategoryClassifier;
 
-    public MetricsController(AnalyticsRepository analyticsRepository) {
+    public MetricsController(AnalyticsRepository analyticsRepository, AppCategoryClassifier appCategoryClassifier) {
         this.analyticsRepository = analyticsRepository;
+        this.appCategoryClassifier = appCategoryClassifier;
     }
 
     @GetMapping
@@ -150,6 +158,27 @@ public class MetricsController {
         return new TopAppsResponse(
                 deviceId, from, to, analyticsRepository.findTopApps(deviceId, from, to, limit)
         );
+    }
+
+    @GetMapping("/behavior-summary")
+    public BehaviorSummaryResponse behaviorSummary(
+            @RequestParam @NotBlank String deviceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to
+    ) {
+        validateTimeRange(from, to, "behavior-summary");
+        Map<BehaviorCategory, CategoryAccumulator> totals = new EnumMap<>(BehaviorCategory.class);
+        for (AppUsageTotal appUsage : analyticsRepository.findAppUsageTotals(deviceId, from, to)) {
+            totals.computeIfAbsent(appCategoryClassifier.classify(appUsage.app()), ignored -> new CategoryAccumulator())
+                    .add(appUsage.usageMilliseconds());
+        }
+        List<CategoryUsage> categories = totals.entrySet().stream()
+                .map(entry -> new CategoryUsage(entry.getKey().label(), entry.getValue().usageMilliseconds, entry.getValue().appCount))
+                .sorted(Comparator.comparingLong(CategoryUsage::usageMilliseconds).reversed().thenComparing(CategoryUsage::category))
+                .toList();
+        long totalUsageMilliseconds = categories.stream().mapToLong(CategoryUsage::usageMilliseconds).sum();
+        int appCount = categories.stream().mapToInt(CategoryUsage::appCount).sum();
+        return new BehaviorSummaryResponse(deviceId, from, to, totalUsageMilliseconds, appCount, categories);
     }
 
     private SessionResponse longestSession(
@@ -321,5 +350,25 @@ public class MetricsController {
             Instant to,
             List<TopApp> apps
     ) {
+    }
+
+    public record BehaviorSummaryResponse(
+            String deviceId,
+            Instant from,
+            Instant to,
+            long totalUsageMilliseconds,
+            int appCount,
+            List<CategoryUsage> categories
+    ) {
+    }
+
+    private static final class CategoryAccumulator {
+        private long usageMilliseconds;
+        private int appCount;
+
+        private void add(long milliseconds) {
+            usageMilliseconds += milliseconds;
+            appCount++;
+        }
     }
 }
