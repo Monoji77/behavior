@@ -18,7 +18,6 @@ import com.personalusageanalytics.analytics.model.TopApp;
 import com.personalusageanalytics.analytics.model.UsageRollup;
 import com.personalusageanalytics.analytics.persistence.AnalyticsRepository;
 import com.personalusageanalytics.analytics.service.AppCategoryClassifier;
-import com.personalusageanalytics.analytics.service.AppTrackingPolicy;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -39,13 +38,10 @@ public class MetricsController {
 
     private final AnalyticsRepository analyticsRepository;
     private final AppCategoryClassifier appCategoryClassifier;
-    private final AppTrackingPolicy appTrackingPolicy;
 
-    public MetricsController(AnalyticsRepository analyticsRepository, AppCategoryClassifier appCategoryClassifier,
-            AppTrackingPolicy appTrackingPolicy) {
+    public MetricsController(AnalyticsRepository analyticsRepository, AppCategoryClassifier appCategoryClassifier) {
         this.analyticsRepository = analyticsRepository;
         this.appCategoryClassifier = appCategoryClassifier;
-        this.appTrackingPolicy = appTrackingPolicy;
     }
 
     @GetMapping
@@ -61,7 +57,6 @@ public class MetricsController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             Instant to
     ) {
-        requireTracked(app);
         return switch (metricName) {
             case "latest-session" -> latestSession(metricName, deviceId, app);
             case "longest-session" -> longestSession(metricName, deviceId, app, from, to);
@@ -83,7 +78,6 @@ public class MetricsController {
             @RequestParam(required = false) String deviceId,
             @RequestParam(required = false) String app
     ) {
-        requireTrackedIfPresent(app);
         Instant earliestUsageAt = (deviceId == null || deviceId.isBlank())
                 ? null
                 : analyticsRepository.findEarliestBucketStart(deviceId, app).orElse(null);
@@ -96,13 +90,11 @@ public class MetricsController {
 
         return new FilterOptionsResponse(
                 analyticsRepository.findDeviceIds(),
-                analyticsRepository.findApps(deviceId).stream().filter(appTrackingPolicy::isTracked).toList(),
+                analyticsRepository.findApps(deviceId),
                 earliestUsageAt,
                 availableDates,
                 topApp,
-                analyticsRepository.findAppIcons().entrySet().stream()
-                        .filter(entry -> appTrackingPolicy.isTracked(entry.getKey()))
-                        .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
+                analyticsRepository.findAppIcons()
         );
     }
 
@@ -121,7 +113,6 @@ public class MetricsController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             Instant to
     ) {
-        requireTracked(app);
         validateTimeRange(from, to, "dashboard");
         RollupGranularity parsedGranularity = parseGranularity(granularity);
         Instant weekTo = Instant.now();
@@ -138,8 +129,7 @@ public class MetricsController {
                 weekTo,
                 analyticsRepository.findUsageTotal(deviceId, app, weekFrom, weekTo),
                 analyticsRepository.findLongestSession(deviceId, app, weekFrom, weekTo).orElse(null),
-                analyticsRepository.findTopAppsScoredByToday(deviceId, 3).stream()
-                        .filter(topApp -> appTrackingPolicy.isTracked(topApp.app())).toList()
+                analyticsRepository.findTopAppsScoredByToday(deviceId, 3)
         );
     }
 
@@ -149,7 +139,6 @@ public class MetricsController {
     private String defaultApp(String deviceId) {
         return analyticsRepository.findTopAppToday(deviceId)
                 .or(() -> analyticsRepository.findTopAppOnLatestDay(deviceId))
-                .filter(appTrackingPolicy::isTracked)
                 .orElse(null);
     }
 
@@ -167,8 +156,7 @@ public class MetricsController {
         validateTimeRange(from, to, "top-apps");
 
         return new TopAppsResponse(
-                deviceId, from, to, analyticsRepository.findTopApps(deviceId, from, to, limit).stream()
-                        .filter(topApp -> appTrackingPolicy.isTracked(topApp.app())).toList()
+                deviceId, from, to, analyticsRepository.findTopApps(deviceId, from, to, limit)
         );
     }
 
@@ -181,9 +169,6 @@ public class MetricsController {
         validateTimeRange(from, to, "behavior-summary");
         Map<BehaviorCategory, CategoryAccumulator> totals = new EnumMap<>(BehaviorCategory.class);
         for (AppUsageTotal appUsage : analyticsRepository.findAppUsageTotals(deviceId, from, to)) {
-            if (!appTrackingPolicy.isTracked(appUsage.app())) {
-                continue;
-            }
             totals.computeIfAbsent(appCategoryClassifier.classify(appUsage.app()), ignored -> new CategoryAccumulator())
                     .add(appUsage.usageMilliseconds());
         }
@@ -301,18 +286,6 @@ public class MetricsController {
 
     private ResponseStatusException badRequest(String detail) {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, detail);
-    }
-
-    private void requireTrackedIfPresent(String app) {
-        if (app != null && !app.isBlank()) {
-            requireTracked(app);
-        }
-    }
-
-    private void requireTracked(String app) {
-        if (!appTrackingPolicy.isTracked(app)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The supplied app is excluded from analytics.");
-        }
     }
 
     public record SessionResponse(
