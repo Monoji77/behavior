@@ -147,13 +147,13 @@ const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 const shiftIsoDay = (day: string, days: number) => new Date(Date.parse(day + "T00:00:00Z") + days * DAY_MILLISECONDS).toISOString().slice(0, 10);
 
 // Range to show for a selection, from its days with data (ascending YYYY-MM-DD):
-// the last 3 days ending on the latest day with data, or every day when the data
-// spans fewer than 3 days. Null when there is no data yet.
+// days with data in the last 3 calendar days, with both endpoints on recorded
+// days. Null when there is no data yet.
 export function defaultDateRange(availableDates: string[]): { from: string; to: string } | null {
   if (!availableDates.length) return null;
   const last = availableDates[availableDates.length - 1];
   const threeDaysBack = shiftIsoDay(last, -2);
-  const first = availableDates[0] > threeDaysBack ? availableDates[0] : threeDaysBack;
+  const first = availableDates.find((day) => day >= threeDaysBack) ?? last;
   return { from: first + "T00:00", to: last + "T23:59" };
 }
 
