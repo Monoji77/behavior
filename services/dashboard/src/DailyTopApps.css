@@ -27,9 +27,8 @@
 }
 .app-podium__identity strong { font-size: 1rem; line-height: 1.25; min-height: 1.25em; overflow-wrap: anywhere; }
 .app-podium__icon {
-  border: 1px solid color-mix(in srgb, var(--medal) 45%, transparent); border-radius: 1rem;
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--medal) 12%, transparent); display: flex; padding: .4rem;
-  transition: transform .35s cubic-bezier(.22, 1, .36, 1), box-shadow .35s ease;
+  display: flex; padding: .4rem;
+  transition: transform .35s cubic-bezier(.22, 1, .36, 1);
 }
 .app-podium__usage { color: var(--muted); font-size: .85rem; line-height: 1.4; }
 .app-podium__crown {
@@ -53,12 +52,8 @@
   color: var(--medal); font-size: clamp(2.4rem, 5vw, 3.6rem); font-weight: 850; line-height: 1;
   text-shadow: 0 2px 18px color-mix(in srgb, var(--medal) 18%, transparent); transition: transform .3s ease;
 }
-.app-podium__action {
-  align-items: center; color: var(--medal); display: flex; font-size: .65rem; font-weight: 650;
-  gap: .2rem; letter-spacing: .02em; margin-top: .6rem; opacity: .7; transition: opacity .2s ease;
-}
 .app-podium__button:hover .app-podium__icon, .app-podium__button:focus-visible .app-podium__icon {
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--medal) 25%, transparent); transform: translateY(-7px) rotate(-4deg);
+  transform: translateY(-7px) rotate(-4deg);
 }
 .app-podium__button:hover .app-podium__pedestal, .app-podium__button:focus-visible .app-podium__pedestal {
   border-color: var(--medal);
@@ -66,7 +61,6 @@
 }
 .app-podium__button:hover .app-podium__pedestal::after, .app-podium__button:focus-visible .app-podium__pedestal::after { transform: translateX(150%); }
 .app-podium__button:hover .app-podium__number { transform: scale(1.1); }
-.app-podium__button:hover .app-podium__action, .app-podium__button:focus-visible .app-podium__action { opacity: 1; }
 .app-podium__button:active .app-podium__icon { transform: translateY(-2px) scale(.94); }
 .app-podium__hint { color: var(--muted); font-size: .75rem; margin: 1rem 0 0; text-align: center; }
 .app-podium[data-count="1"] { grid-template-columns: minmax(0, 240px); justify-content: center; }
@@ -82,10 +76,9 @@
   .app-podium__identity { gap: .5rem; }
   .app-podium__identity strong { font-size: .8rem; }
   .app-podium__usage { font-size: .7rem; }
-  .app-podium__icon { border-radius: .9rem; padding: .3rem; }
+  .app-podium__icon { padding: .3rem; }
   .app-podium__icon .app-icon { height: 42px !important; width: 42px !important; }
   .app-podium__number { font-size: 2.5rem; }
-  .app-podium__action { font-size: .6rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .app-podium__place, .app-podium__crown { animation: none; }
