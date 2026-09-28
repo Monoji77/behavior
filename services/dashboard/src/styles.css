@@ -386,3 +386,25 @@ button.brand:focus-visible{outline:2px solid var(--accent-bright);outline-offset
 @media (max-width:600px){.title-with-toggle{align-items:flex-start;flex-direction:column;gap:.6rem}.summary-toggle{width:100%}.summary-toggle button{font-size:.74rem;min-height:2.45rem}}
 @media (prefers-reduced-motion:reduce){.summary-toggle__indicator,.summary-toggle button{transition:none}.dashboard-view{animation:none}}
 
+
+/* Persisted activity remains visible after the pipeline animation finishes. */
+.pipeline-activity{margin-top:1.4rem;padding:1.2rem}
+.pipeline-activity header,.daily-top-apps header{align-items:center;display:flex;gap:1rem;justify-content:space-between}
+.pipeline-activity header p:last-child{color:var(--muted);font-size:.8rem;margin-top:.35rem}
+.pipeline-activity__scroll{max-height:23rem;overflow:auto;margin-top:1rem}
+.pipeline-activity table{border-collapse:collapse;font-size:.8rem;text-align:left;width:100%}
+.pipeline-activity th{background:var(--panel);color:var(--muted);font-size:.7rem;position:sticky;top:0;z-index:1}
+.pipeline-activity th,.pipeline-activity td{border-bottom:1px solid var(--line);padding:.75rem .65rem;vertical-align:middle}
+.pipeline-activity td small{color:var(--muted);display:block;font-size:.7rem;margin-top:.15rem}
+.pipeline-activity time{white-space:nowrap}
+.pipeline-activity__app{align-items:center;display:flex;gap:.55rem;min-width:9rem}
+.event-kind{background:var(--accent-soft);border-radius:999px;color:var(--accent-bright);display:inline-block;font-size:.65rem;font-weight:750;padding:.25rem .5rem}
+.event-kind--close{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
+.daily-top-apps{grid-column:1/-1;padding:1.3rem}
+.daily-top-apps ol{display:grid;gap:.8rem;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;margin:1.2rem 0 0;padding:0}
+.daily-top-apps li{align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:.9rem;display:flex;gap:.7rem;padding:1rem}
+.daily-top-apps li strong{flex:1;min-width:0;overflow-wrap:anywhere}
+.daily-top-apps li>span:last-child{color:var(--muted);font-size:.8rem;white-space:nowrap}
+.daily-top-apps__rank{align-items:center;border-radius:50%;color:#1e1b4b;display:flex;font-size:.8rem;font-weight:800;height:1.6rem;justify-content:center;min-width:1.6rem}
+.daily-top-apps__rank--1{background:#fbbf24}.daily-top-apps__rank--2{background:#d1d5db}.daily-top-apps__rank--3{background:#d9894a}
+@media(max-width:1000px){.daily-top-apps ol{grid-template-columns:1fr}}

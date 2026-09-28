@@ -16,6 +16,9 @@ import com.personalusageanalytics.analytics.model.UsageRollup;
 import com.personalusageanalytics.analytics.model.AnomalyCount;
 import com.personalusageanalytics.analytics.model.TopApp;
 import com.personalusageanalytics.analytics.model.AppUsageTotal;
+import com.personalusageanalytics.analytics.model.DashboardVisibility;
+import com.personalusageanalytics.analytics.model.StoredPipelineEvent;
+import java.util.Arrays;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -24,6 +27,16 @@ import org.springframework.stereotype.Repository;
 // Converts SQL rows into java objects
 @Repository
 public class AnalyticsRepository {
+
+    private static final String VISIBLE_ROLLUPS = "(SELECT * FROM app_usage_rollups WHERE "
+            + DashboardVisibility.sql("device_id", "app") + ")";
+    private static final String VISIBLE_SESSIONS = "(SELECT * FROM app_usage_sessions WHERE "
+            + DashboardVisibility.sql("device_id", "app") + ")";
+    private static final String VISIBLE_ANOMALIES = "(SELECT * FROM app_usage_event_anomalies WHERE "
+            + DashboardVisibility.sql("device_id", "app") + ")";
+    private static final String VISIBLE_ICONS = "(SELECT * FROM app_icons WHERE "
+            + DashboardVisibility.sql(null, "app") + ")";
+
 
     private static final String FIND_LATEST_SESSION = """
             SELECT
@@ -37,12 +50,12 @@ public class AnalyticsRepository {
                 status,
                 duplicate_open_count,
                 finalized_at
-            FROM app_usage_sessions
+            FROM %s
             WHERE device_id = ?
               AND app = ?
             ORDER BY opened_at DESC
             LIMIT 1
-            """;
+            """.formatted(VISIBLE_SESSIONS);
     private static final String FIND_LONGEST_SESSION = """
             SELECT
                 session_id,
@@ -55,7 +68,7 @@ public class AnalyticsRepository {
                 status,
                 duplicate_open_count,
                 finalized_at
-            FROM app_usage_sessions
+            FROM %s
             WHERE device_id = ?
               AND app = ?
               AND status = 'COMPLETED'
@@ -63,7 +76,7 @@ public class AnalyticsRepository {
               AND opened_at < ?
             ORDER BY duration_milliseconds DESC, opened_at DESC
             LIMIT 1
-            """;
+            """.formatted(VISIBLE_SESSIONS);
     private static final String FIND_USAGE_ROLLUPS = """
             SELECT
                 device_id,
@@ -73,84 +86,84 @@ public class AnalyticsRepository {
                 bucket_start,
                 usage_milliseconds,
                 updated_at
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
             AND app = ?
             AND granularity = ?
             AND bucket_start >= ?
             AND bucket_start < ?
             ORDER BY bucket_start ASC
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
 
     private static final String FIND_ANOMALY_COUNTS = """
             SELECT
                 anomaly_type,
                 COUNT(*) AS anomaly_count
-            FROM app_usage_event_anomalies
+            FROM %s
             WHERE device_id = ?
             AND app = ?
             AND occurred_at >= ?
             AND occurred_at < ?
             GROUP BY anomaly_type
             ORDER BY anomaly_type ASC
-            """;
+            """.formatted(VISIBLE_ANOMALIES);
     private static final String FIND_DEVICE_IDS = """
             SELECT DISTINCT device_id
-            FROM app_usage_rollups
+            FROM %s
             ORDER BY device_id ASC
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private static final String FIND_APPS = """
             SELECT DISTINCT app
-            FROM app_usage_rollups
+            FROM %s
             ORDER BY app ASC
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private static final String FIND_APPS_FOR_DEVICE = """
             SELECT DISTINCT app
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
             ORDER BY app ASC
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private static final String FIND_EARLIEST_BUCKET_START_FOR_DEVICE = """
             SELECT MIN(bucket_start) AS earliest_bucket_start
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private static final String FIND_EARLIEST_BUCKET_START_FOR_DEVICE_AND_APP = """
             SELECT MIN(bucket_start) AS earliest_bucket_start
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
             AND app = ?
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private static final String FIND_AVAILABLE_DATES_FOR_DEVICE = """
             SELECT DISTINCT (bucket_start AT TIME ZONE bucket_timezone)::date AS usage_date
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
             ORDER BY usage_date ASC
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private static final String FIND_AVAILABLE_DATES_FOR_DEVICE_AND_APP = """
             SELECT DISTINCT (bucket_start AT TIME ZONE bucket_timezone)::date AS usage_date
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
             AND app = ?
             ORDER BY usage_date ASC
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     // Daily buckets are already cut at local midnight (bucket_timezone), so the
     // most recent day with usage is today whenever there is any usage today.
     private static final String FIND_TOP_APP_ON_LATEST_DAY = """
             SELECT app
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
             AND granularity = 'DAY'
             AND usage_milliseconds > 0
             GROUP BY app, bucket_start
             ORDER BY bucket_start DESC, SUM(usage_milliseconds) DESC, app ASC
             LIMIT 1
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     // Ranks apps by *today's* usage only (local day, DAY-granularity bucket),
     // independent of whatever range the caller displays alongside the rank.
     private static final String FIND_TOP_APP_NAMES_TODAY = """
             SELECT app
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
               AND granularity = 'DAY'
               AND (bucket_start AT TIME ZONE bucket_timezone)::date = (now() AT TIME ZONE bucket_timezone)::date
@@ -158,12 +171,12 @@ public class AnalyticsRepository {
             GROUP BY app
             ORDER BY SUM(usage_milliseconds) DESC, app ASC
             LIMIT ?
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     // Same ranking as above, but also returns each app's today total: both the
     // rank order and the duration shown next to it come from today's usage.
     private static final String FIND_TOP_APPS_TODAY = """
             SELECT app, SUM(usage_milliseconds) AS usage_milliseconds
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
               AND granularity = 'DAY'
               AND (bucket_start AT TIME ZONE bucket_timezone)::date = (now() AT TIME ZONE bucket_timezone)::date
@@ -171,16 +184,16 @@ public class AnalyticsRepository {
             GROUP BY app
             ORDER BY SUM(usage_milliseconds) DESC, app ASC
             LIMIT ?
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private static final String FIND_APP_ICONS = """
             SELECT app, icon_url
-            FROM app_icons
+            FROM %s
             WHERE icon_url IS NOT NULL
-            """;
+            """.formatted(VISIBLE_ICONS);
     // Hourly buckets (one timezone) give an exact [from, to) window.
     private static final String FIND_TOP_APPS = """
             SELECT r.app, SUM(r.usage_milliseconds) AS usage_milliseconds, i.icon_url
-            FROM app_usage_rollups r
+            FROM %s r
             LEFT JOIN app_icons i ON i.app = r.app
             WHERE r.device_id = ?
               AND r.granularity = 'HOUR'
@@ -190,19 +203,19 @@ public class AnalyticsRepository {
             HAVING SUM(r.usage_milliseconds) > 0
             ORDER BY usage_milliseconds DESC, r.app ASC
             LIMIT ?
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private static final String FIND_USAGE_TOTAL = """
             SELECT COALESCE(SUM(usage_milliseconds), 0)
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
               AND app = ?
               AND granularity = 'HOUR'
               AND bucket_start >= ?
               AND bucket_start < ?
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private static final String FIND_APP_USAGE_TOTALS = """
             SELECT app, SUM(usage_milliseconds) AS usage_milliseconds
-            FROM app_usage_rollups
+            FROM %s
             WHERE device_id = ?
               AND granularity = 'HOUR'
               AND bucket_start >= ?
@@ -210,7 +223,7 @@ public class AnalyticsRepository {
             GROUP BY app
             HAVING SUM(usage_milliseconds) > 0
             ORDER BY usage_milliseconds DESC, app ASC
-            """;
+            """.formatted(VISIBLE_ROLLUPS);
     private final JdbcTemplate jdbcTemplate;
 
     public AnalyticsRepository(JdbcTemplate jdbcTemplate) {
@@ -233,6 +246,27 @@ public class AnalyticsRepository {
                 resultSet.getTimestamp("finalized_at").toInstant()
         );
     };
+
+    // One row per stored raw event, including CLOSE events without a completed
+    // session. Bound the history before looking up the visible apps it closed.
+    public List<StoredPipelineEvent> findRecentPipelineEvents() {
+        String sql = """
+                SELECT e.*, i.icon_url,
+                    ARRAY(SELECT DISTINCT s.app FROM %s s
+                          WHERE s.close_event_id = e.event_id AND s.device_id = e.device_id
+                            AND s.closed_at = e.occurred_at ORDER BY s.app) AS closed_apps
+                FROM (SELECT * FROM raw_app_events
+                      WHERE %s
+                      ORDER BY created_at DESC, occurred_at DESC, event_id DESC LIMIT 30) e
+                LEFT JOIN %s i ON i.app = e.app
+                ORDER BY e.created_at DESC, e.occurred_at DESC, e.event_id DESC
+                """.formatted(VISIBLE_SESSIONS, DashboardVisibility.sql("device_id", "app"), VISIBLE_ICONS);
+        return jdbcTemplate.query(sql, (row, index) -> new StoredPipelineEvent(
+                row.getObject("event_id", UUID.class), row.getString("event_type"),
+                row.getString("app"), row.getString("icon_url"), row.getString("device_id"),
+                row.getTimestamp("occurred_at").toInstant(), row.getTimestamp("created_at").toInstant(),
+                Arrays.asList((String[]) row.getArray("closed_apps").getArray())));
+    }
 
     public Optional<LatestSession> findLatestSession(String deviceId, String app) {
         return jdbcTemplate.query(FIND_LATEST_SESSION, SESSION_ROW_MAPPER, deviceId, app)
@@ -325,6 +359,7 @@ public class AnalyticsRepository {
     }
 
     public String findAppIcon(String app) {
+        if (!DashboardVisibility.isVisibleApp(app)) return null;
         return jdbcTemplate.queryForList("SELECT icon_url FROM app_icons WHERE app = ? AND icon_url IS NOT NULL", String.class, app)
                 .stream().findFirst().orElse(null);
     }

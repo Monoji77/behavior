@@ -1,6 +1,7 @@
 package com.personalusageanalytics.analytics.live;
 
 import java.time.Instant;
+import com.personalusageanalytics.analytics.model.DashboardVisibility;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -14,6 +15,9 @@ final class LiveEvents {
 
     static LiveEvent fromNotification(String payload, JsonMapper jsonMapper, Function<String, String> iconFor, boolean anonymous) {
         Map<?, ?> fields = jsonMapper.readValue(payload, Map.class);
+        if (!DashboardVisibility.isVisible((String) fields.get("deviceId"), (String) fields.get("app"))) {
+            return null;
+        }
         String kind = String.valueOf(fields.get("kind"));
         Object at = fields.get("at");
         Object duration = fields.get("durationMilliseconds");
