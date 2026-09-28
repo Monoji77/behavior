@@ -13,6 +13,25 @@ class LiveEventsTest {
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     @Test
+    void excludesHiddenAppsBeforeAnonymizing() {
+        for (boolean anonymous : new boolean[] {false, true}) {
+            assertNull(LiveEvents.fromNotification(
+                    "{\"kind\":\"OPEN\",\"app\":\"  gRiNdR  \",\"deviceId\":\"iPhone 16 Pro\"}",
+                    jsonMapper, app -> { throw new AssertionError("Hidden icons must not be loaded"); }, anonymous));
+        }
+    }
+
+    @Test
+    void excludesDiagnosticCollectorsAndTestApps() {
+        assertNull(LiveEvents.fromNotification(
+                "{\"kind\":\"OPEN\",\"app\":\"Instagram\",\"deviceId\":\"shortcut-check-20260928043905\"}",
+                jsonMapper, app -> null, false));
+        assertNull(LiveEvents.fromNotification(
+                "{\"kind\":\"OPEN\",\"app\":\"connectivity-test\",\"deviceId\":\"iPhone 16 Pro\"}",
+                jsonMapper, app -> null, false));
+    }
+
+    @Test
     void readsAnOpenWithItsIcon() {
         LiveEvent event = LiveEvents.fromNotification(
                 "{\"kind\" : \"OPEN\", \"app\" : \"Telegram\", \"deviceId\" : \"iPhone 16 Pro\", \"at\" : \"2026-09-24T01:00:00+00:00\"}",

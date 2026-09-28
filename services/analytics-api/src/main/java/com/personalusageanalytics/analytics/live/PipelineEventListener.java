@@ -105,7 +105,8 @@ public class PipelineEventListener implements SmartLifecycle {
 
     private void relay(String payload) {
         try {
-            broadcaster.publish(LiveEvents.fromNotification(payload, jsonMapper, repository::findAppIcon, anonymous));
+            LiveEvent event = LiveEvents.fromNotification(payload, jsonMapper, repository::findAppIcon, anonymous);
+            if (event != null) broadcaster.publish(event);
         } catch (RuntimeException exception) {
             log.warn("Skipping unreadable pipeline event: {}", exception.getMessage());
         }

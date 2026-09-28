@@ -337,14 +337,6 @@
 
 
 
-.is-sidebar-collapsed 
-
-
-
-
-
-
-
 @media (max-width:820px){.shell.is-sidebar-collapsed{grid-template-columns:none}}
 
 /* Portfolio link at the foot of the sidebar. */
@@ -380,3 +372,39 @@ button.brand:focus-visible{outline:2px solid var(--accent-bright);outline-offset
    utility machinery; apply it as a plain box-shadow instead. */
 [data-slot="tooltip-content"]{box-shadow:var(--shadow)}
 
+/* Dashboard keeps its summaries in one visual group. The selection pill moves
+   between the two views, and the newly selected view enters as a short card-like motion. */
+.title-with-toggle{align-items:center;display:flex;flex-wrap:wrap;gap:.85rem}
+.summary-toggle{background:var(--surface);border:1px solid var(--line);border-radius:.8rem;display:grid;grid-template-columns:1fr 1fr;isolation:isolate;padding:.2rem;position:relative}
+.summary-toggle button{background:transparent;border:0;border-radius:.6rem;color:var(--muted);cursor:pointer;font:inherit;font-size:.78rem;font-weight:750;padding:.48rem .7rem;position:relative;transition:color .22s ease,transform .22s ease;z-index:1}
+.summary-toggle button[aria-selected="true"]{color:#fff;transform:translateY(-1px)}
+.summary-toggle button:focus-visible{outline:2px solid var(--accent-bright);outline-offset:2px}
+.summary-toggle__indicator{background:var(--accent);border-radius:.6rem;bottom:.2rem;box-shadow:0 5px 14px color-mix(in srgb,var(--accent) 32%,transparent);left:.2rem;pointer-events:none;position:absolute;top:.2rem;transform:translateX(0);transition:transform .28s cubic-bezier(.2,.8,.2,1);width:calc(50% - .2rem);z-index:0}
+.summary-toggle__indicator.is-apps{transform:translateX(100%)}
+.dashboard-view{animation:dashboard-view-in .28s cubic-bezier(.2,.8,.2,1) both}
+@keyframes dashboard-view-in{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@media (max-width:600px){.title-with-toggle{align-items:flex-start;flex-direction:column;gap:.6rem}.summary-toggle{width:100%}.summary-toggle button{font-size:.74rem;min-height:2.45rem}}
+@media (prefers-reduced-motion:reduce){.summary-toggle__indicator,.summary-toggle button{transition:none}.dashboard-view{animation:none}}
+
+
+/* Persisted activity remains visible after the pipeline animation finishes. */
+.pipeline-activity{margin-top:1.4rem;padding:1.2rem}
+.pipeline-activity header,.daily-top-apps header{align-items:center;display:flex;gap:1rem;justify-content:space-between}
+.pipeline-activity header p:last-child{color:var(--muted);font-size:.8rem;margin-top:.35rem}
+.pipeline-activity__scroll{max-height:23rem;overflow:auto;margin-top:1rem}
+.pipeline-activity table{border-collapse:collapse;font-size:.8rem;text-align:left;width:100%}
+.pipeline-activity th{background:var(--panel);color:var(--muted);font-size:.7rem;position:sticky;top:0;z-index:1}
+.pipeline-activity th,.pipeline-activity td{border-bottom:1px solid var(--line);padding:.75rem .65rem;vertical-align:middle}
+.pipeline-activity td small{color:var(--muted);display:block;font-size:.7rem;margin-top:.15rem}
+.pipeline-activity time{white-space:nowrap}
+.pipeline-activity__app{align-items:center;display:flex;gap:.55rem;min-width:9rem}
+.event-kind{background:var(--accent-soft);border-radius:999px;color:var(--accent-bright);display:inline-block;font-size:.65rem;font-weight:750;padding:.25rem .5rem}
+.event-kind--close{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
+.daily-top-apps{grid-column:1/-1;padding:1.3rem}
+.daily-top-apps ol{display:grid;gap:.8rem;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;margin:1.2rem 0 0;padding:0}
+.daily-top-apps li{align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:.9rem;display:flex;gap:.7rem;padding:1rem}
+.daily-top-apps li strong{flex:1;min-width:0;overflow-wrap:anywhere}
+.daily-top-apps li>span:last-child{color:var(--muted);font-size:.8rem;white-space:nowrap}
+.daily-top-apps__rank{align-items:center;border-radius:50%;color:#1e1b4b;display:flex;font-size:.8rem;font-weight:800;height:1.6rem;justify-content:center;min-width:1.6rem}
+.daily-top-apps__rank--1{background:#fbbf24}.daily-top-apps__rank--2{background:#d1d5db}.daily-top-apps__rank--3{background:#d9894a}
+@media(max-width:1000px){.daily-top-apps ol{grid-template-columns:1fr}}

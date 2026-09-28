@@ -1,3 +1,5 @@
+import { isVisibleActivity, isVisibleApp, isVisibleIdentifier } from "./visibility";
+
 export type Granularity = "HOUR" | "DAY";
 
 export interface Filters {
@@ -46,6 +48,45 @@ export interface TopApp {
   app: string;
   usageMilliseconds: number;
   iconUrl: string | null;
+}
+
+export interface CategoryUsage {
+  category: string;
+  usageMilliseconds: number;
+  appCount: number;
+}
+
+export interface StoredPipelineEvent {
+  eventId: string;
+  kind: "OPEN" | "CLOSE";
+  app: string | null;
+  iconUrl: string | null;
+  deviceId: string | null;
+  at: string;
+  storedAt: string;
+  closedApps: string[];
+}
+
+export async function loadPipelineEvents(signal?: AbortSignal): Promise<StoredPipelineEvent[]> {
+  const events = await getJson<StoredPipelineEvent[]>("/api/v1/pipeline/recent", signal);
+  return events.filter(isVisibleActivity).map((event) => ({ ...event, closedApps: event.closedApps.filter(isVisibleApp) }));
+}
+
+export interface BehaviorSummary {
+  totalUsageMilliseconds: number;
+  appCount: number;
+  categories: CategoryUsage[];
+  topApps: TopApp[];
+}
+
+// A full local calendar day, including the last minute before midnight.
+export function dailyRange(date = new Date()): { from: string; to: string } {
+  const midnight = new Date(date);
+  midnight.setHours(0, 0, 0, 0);
+  const next = new Date(midnight);
+  next.setDate(next.getDate() + 1);
+  const localDay = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}T00:00`;
+  return { from: localDay(midnight), to: localDay(next) };
 }
 
 // App menu order: the week's top apps first (most used first), then the rest alphabetically.
@@ -107,7 +148,9 @@ export type DefaultSelection = { deviceId?: string; app?: string; done: boolean 
 // Never replaces something already chosen.
 export function defaultSelection(deviceId: string, app: string, options: FilterOptions): DefaultSelection {
   if (!deviceId) {
-    const device = options.deviceIds[0];
+    // This dashboard belongs to Chris's phone; retain a sensible fallback when
+    // other devices are later connected.
+    const device = options.deviceIds.find((item) => item === "iPhone 16 Pro") ?? options.deviceIds[0];
     return device ? { deviceId: device, done: false } : { done: true };
   }
   return !app && options.topApp ? { app: options.topApp, done: true } : { done: true };
@@ -158,8 +201,25 @@ export function filterOptionsUrl(deviceId?: string, app?: string): string {
   return "/api/v1/metrics/filter-options" + (query ? "?" + query : "");
 }
 
-export function loadFilterOptions(deviceId?: string, app?: string): Promise<FilterOptions> {
-  return getJson<FilterOptions>(filterOptionsUrl(deviceId, app));
+export async function loadFilterOptions(deviceId?: string, app?: string): Promise<FilterOptions> {
+  const options = await getJson<FilterOptions>(filterOptionsUrl(deviceId, app));
+  return {
+    ...options,
+    deviceIds: options.deviceIds.filter(isVisibleIdentifier),
+    apps: options.apps.filter(isVisibleApp),
+    topApp: options.topApp && isVisibleApp(options.topApp) ? options.topApp : null,
+    appIcons: Object.fromEntries(Object.entries(options.appIcons).filter(([name]) => isVisibleApp(name)))
+  };
+}
+
+export function behaviorSummaryUrl(deviceId: string, from: string, to: string): string {
+  const search = new URLSearchParams({ deviceId, from: new Date(from).toISOString(), to: new Date(to).toISOString() });
+  return `/api/v1/metrics/behavior-summary?${search.toString()}`;
+}
+
+export async function loadBehaviorSummary(deviceId: string, from: string, to: string, signal?: AbortSignal): Promise<BehaviorSummary> {
+  const summary = await getJson<BehaviorSummary>(behaviorSummaryUrl(deviceId, from, to), signal);
+  return { ...summary, topApps: (summary.topApps ?? []).filter((entry) => isVisibleApp(entry.app)).slice(0, 3) };
 }
 
 const RATE_LIMIT_RETRY_MILLISECONDS = 1500;
@@ -183,7 +243,7 @@ export async function loadDashboard(filters: Filters, signal?: AbortSignal): Pro
   return {
     longestSession: response.longestSession,
     rollups: response.buckets,
-    topApps: response.topApps,
+    topApps: response.topApps.filter((entry) => isVisibleApp(entry.app)),
     pastWeekMilliseconds: response.pastWeekMilliseconds
   };
 }
