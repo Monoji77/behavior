@@ -72,6 +72,21 @@ export async function loadPipelineEvents(signal?: AbortSignal): Promise<StoredPi
   return events.filter(isVisibleActivity).map((event) => ({ ...event, closedApps: event.closedApps.filter(isVisibleApp) }));
 }
 
+export interface CurrentActivity {
+  deviceId: string | null;
+  app: string | null;
+  iconUrl: string | null;
+  status: "ACTIVE" | "COMPLETED";
+  openedAt: string;
+  closedAt: string | null;
+  durationMilliseconds: number | null;
+}
+
+export async function loadCurrentActivity(signal?: AbortSignal): Promise<CurrentActivity | null> {
+  const { activity } = await getJson<{ activity: CurrentActivity | null }>("/api/v1/pipeline/current", signal);
+  return activity && isVisibleActivity(activity) ? activity : null;
+}
+
 export interface BehaviorSummary {
   totalUsageMilliseconds: number;
   appCount: number;

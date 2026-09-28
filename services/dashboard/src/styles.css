@@ -387,16 +387,17 @@ button.brand:focus-visible{outline:2px solid var(--accent-bright);outline-offset
 @media (prefers-reduced-motion:reduce){.summary-toggle__indicator,.summary-toggle button{transition:none}.dashboard-view{animation:none}}
 
 
-/* Persisted activity remains visible after the pipeline animation finishes. */
-.pipeline-activity{margin-top:1.4rem;padding:1.2rem}
-.pipeline-activity header,.daily-top-apps header{align-items:center;display:flex;gap:1rem;justify-content:space-between}
-.pipeline-activity header p:last-child{color:var(--muted);font-size:.8rem;margin-top:.35rem}
-.pipeline-activity__scroll{max-height:23rem;overflow:auto;margin-top:1rem}
-.pipeline-activity table{border-collapse:collapse;font-size:.8rem;text-align:left;width:100%}
-.pipeline-activity th{background:var(--panel);color:var(--muted);font-size:.7rem;position:sticky;top:0;z-index:1}
-.pipeline-activity th,.pipeline-activity td{border-bottom:1px solid var(--line);padding:.75rem .65rem;vertical-align:middle}
-.pipeline-activity td small{color:var(--muted);display:block;font-size:.7rem;margin-top:.15rem}
-.pipeline-activity time{white-space:nowrap}
-.pipeline-activity__app{align-items:center;display:flex;gap:.55rem;min-width:9rem}
-.event-kind{background:var(--accent-soft);border-radius:999px;color:var(--accent-bright);display:inline-block;font-size:.65rem;font-weight:750;padding:.25rem .5rem}
-.event-kind--close{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
+/* The single current session sits beside the live connection indicator. */
+.daily-top-apps header{align-items:center;display:flex;gap:1rem;justify-content:space-between}
+.pipeline-intro{max-width:none}
+.pipeline-live{align-items:center;flex-wrap:wrap;gap:.6rem 1rem;line-height:1.65}
+.pipeline-live__connection{align-items:center;display:inline-flex;flex-shrink:0;gap:.5rem}
+.pipeline-live__connection i{flex-shrink:0}
+.pipeline-current{align-items:center;display:inline-flex;flex-wrap:wrap;gap:.35rem .65rem;min-width:0}
+.pipeline-current__app{align-items:center;color:var(--text);display:inline-flex;gap:.4rem;overflow-wrap:anywhere}
+.pipeline-current__state{color:var(--muted);font-size:.75rem}
+.pipeline-current__state.is-active{color:var(--green)}
+.pipeline-current__detail{font-size:.75rem;font-weight:500}
+.pipeline-current__detail time,.pipeline-current__detail strong{color:var(--text);font-weight:600}
+.pipeline-live>small{color:var(--rose);font-size:.75rem}
+@media(max-width:600px){.pipeline-live{align-items:flex-start;flex-direction:column}.pipeline-current{align-items:flex-start;gap:.3rem .6rem}}
