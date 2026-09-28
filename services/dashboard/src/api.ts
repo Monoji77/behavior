@@ -33,6 +33,7 @@ export interface DashboardData {
   rollups: UsageRollup[];
   topApps: TopApp[];
   pastWeekMilliseconds: number;
+  recentActivity: RecentActivity | null;
 }
 
 export interface FilterOptions {
@@ -77,6 +78,21 @@ export interface BehaviorSummary {
   appCount: number;
   categories: CategoryUsage[];
   topApps: TopApp[];
+  recentActivity: RecentActivity | null;
+}
+
+export interface RecentActivity {
+  deviceId: string;
+  app: string;
+  iconUrl: string | null;
+  status: "ACTIVE" | "COMPLETED";
+  openedAt: string;
+  closedAt: string | null;
+  durationMilliseconds: number | null;
+}
+
+function visibleRecentActivity(activity: RecentActivity | null | undefined): RecentActivity | null {
+  return activity && isVisibleActivity(activity) ? activity : null;
 }
 
 // A full local calendar day, including the last minute before midnight.
@@ -161,6 +177,7 @@ interface DashboardResponse {
   pastWeekMilliseconds: number;
   longestSession: Session | null;
   topApps: TopApp[];
+  recentActivity?: RecentActivity | null;
 }
 
 export class DashboardApiError extends Error {
@@ -219,7 +236,7 @@ export function behaviorSummaryUrl(deviceId: string, from: string, to: string): 
 
 export async function loadBehaviorSummary(deviceId: string, from: string, to: string, signal?: AbortSignal): Promise<BehaviorSummary> {
   const summary = await getJson<BehaviorSummary>(behaviorSummaryUrl(deviceId, from, to), signal);
-  return { ...summary, topApps: (summary.topApps ?? []).filter((entry) => isVisibleApp(entry.app)).slice(0, 3) };
+  return { ...summary, topApps: (summary.topApps ?? []).filter((entry) => isVisibleApp(entry.app)).slice(0, 3), recentActivity: visibleRecentActivity(summary.recentActivity) };
 }
 
 const RATE_LIMIT_RETRY_MILLISECONDS = 1500;
@@ -244,6 +261,7 @@ export async function loadDashboard(filters: Filters, signal?: AbortSignal): Pro
     longestSession: response.longestSession,
     rollups: response.buckets,
     topApps: response.topApps.filter((entry) => isVisibleApp(entry.app)),
-    pastWeekMilliseconds: response.pastWeekMilliseconds
+    pastWeekMilliseconds: response.pastWeekMilliseconds,
+    recentActivity: visibleRecentActivity(response.recentActivity)
   };
 }

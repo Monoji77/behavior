@@ -42,6 +42,11 @@ Everything above is one identical code path for two environments — see
 The Pipeline page also loads the latest 30 stored OPEN/CLOSE events, including
 their event and storage timestamps, and refreshes them as activity arrives.
 Daily Summary presents today's top three apps on an animated, interactive podium.
+Both summary views show recent activity: the newest active session takes priority,
+otherwise the latest completed session by closing time appears. Active activity
+shows its opening date and time; completed activity shows duration and closing
+time. Summaries refresh on live activity, every 15 seconds as a fallback, and when
+the browser regains focus.
 Select a pedestal to open that app's summary. Excluded apps and test or diagnostic
 entries stay out of dashboard analytics, selectors, icons, and live activity.
 Excluded app events are discarded before Kafka publishing and during replay.

@@ -18,6 +18,7 @@ import com.personalusageanalytics.analytics.model.TopApp;
 import com.personalusageanalytics.analytics.model.AppUsageTotal;
 import com.personalusageanalytics.analytics.model.DashboardVisibility;
 import com.personalusageanalytics.analytics.model.StoredPipelineEvent;
+import com.personalusageanalytics.analytics.model.RecentActivity;
 import java.util.Arrays;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,10 +33,35 @@ public class AnalyticsRepository {
             + DashboardVisibility.sql("device_id", "app") + ")";
     private static final String VISIBLE_SESSIONS = "(SELECT * FROM app_usage_sessions WHERE "
             + DashboardVisibility.sql("device_id", "app") + ")";
+    private static final String VISIBLE_ACTIVE_SESSIONS = "(SELECT * FROM active_app_sessions WHERE "
+            + DashboardVisibility.sql("device_id", "app") + ")";
     private static final String VISIBLE_ANOMALIES = "(SELECT * FROM app_usage_event_anomalies WHERE "
             + DashboardVisibility.sql("device_id", "app") + ")";
     private static final String VISIBLE_ICONS = "(SELECT * FROM app_icons WHERE "
             + DashboardVisibility.sql(null, "app") + ")";
+
+    // Current activity outranks completed usage, even when it opened earlier.
+    // A completed fallback is ordered by closing time, not opening time.
+    private static final String FIND_RECENT_ACTIVITY = """
+            SELECT activity.device_id, activity.app, icons.icon_url, activity.status,
+                   activity.opened_at, activity.closed_at, activity.duration_milliseconds
+            FROM (
+                SELECT * FROM (
+                    SELECT device_id, app, 'ACTIVE' AS status, opened_at,
+                           NULL::timestamptz AS closed_at, NULL::bigint AS duration_milliseconds,
+                           0 AS priority
+                    FROM %s
+                    UNION ALL
+                    SELECT device_id, app, status, opened_at, closed_at, duration_milliseconds,
+                           1 AS priority
+                    FROM %s WHERE status = 'COMPLETED' AND closed_at IS NOT NULL
+                ) candidates
+                WHERE device_id = ? AND (?::text IS NULL OR app = ?)
+                ORDER BY priority, COALESCE(closed_at, opened_at) DESC, opened_at DESC, app ASC
+                LIMIT 1
+            ) activity
+            LEFT JOIN %s icons ON icons.app = activity.app
+            """.formatted(VISIBLE_ACTIVE_SESSIONS, VISIBLE_SESSIONS, VISIBLE_ICONS);
 
 
     private static final String FIND_LATEST_SESSION = """
@@ -271,6 +297,17 @@ public class AnalyticsRepository {
     public Optional<LatestSession> findLatestSession(String deviceId, String app) {
         return jdbcTemplate.query(FIND_LATEST_SESSION, SESSION_ROW_MAPPER, deviceId, app)
                 .stream().findFirst();
+    }
+
+    public Optional<RecentActivity> findRecentActivity(String deviceId, String app) {
+        return jdbcTemplate.query(FIND_RECENT_ACTIVITY, (row, index) -> {
+            Timestamp closedAt = row.getTimestamp("closed_at");
+            return new RecentActivity(row.getString("device_id"), row.getString("app"),
+                    row.getString("icon_url"), row.getString("status"),
+                    row.getTimestamp("opened_at").toInstant(),
+                    closedAt == null ? null : closedAt.toInstant(),
+                    row.getObject("duration_milliseconds", Long.class));
+        }, deviceId, app, app).stream().findFirst();
     }
 
     // Longest completed session opened within [from, to).
