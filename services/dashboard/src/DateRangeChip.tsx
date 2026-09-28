@@ -1,5 +1,5 @@
-import { getLocalTimeZone, parseDate, today, type CalendarDate } from "@internationalized/date";
-import { useEffect, useRef, useState } from "react";
+import { getLocalTimeZone, parseDate, today, type CalendarDate, type DateValue } from "@internationalized/date";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   CalendarCell,
@@ -21,14 +21,13 @@ const localDay = (isoInstant: string) => {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 };
 
-function RangeCell({ date, maxValue }: { date: CalendarDate; maxValue: CalendarDate }) {
+function RangeCell({ date }: { date: CalendarDate }) {
   const isTodayDate = date.compare(today(getLocalTimeZone())) === 0;
-  const isPredictive = date.compare(today(getLocalTimeZone())) > 0 && date.compare(maxValue) <= 0;
 
   return (
     <CalendarCell
       date={date}
-      className={({ isSelected, isSelectionStart, isSelectionEnd, isFocusVisible, isDisabled, isOutsideMonth }) =>
+      className={({ isSelected, isSelectionStart, isSelectionEnd, isFocusVisible, isDisabled, isUnavailable, isOutsideMonth }) =>
         [
           "rc-cell",
           isSelected && "rc-cell--selected",
@@ -36,15 +35,15 @@ function RangeCell({ date, maxValue }: { date: CalendarDate; maxValue: CalendarD
           isSelectionEnd && "rc-cell--end",
           isFocusVisible && "rc-cell--focus",
           isDisabled && "rc-cell--disabled",
+          isUnavailable && "rc-cell--unavailable",
           isOutsideMonth && "rc-cell--outside",
         ].filter(Boolean).join(" ")
       }
     >
-      {({ formattedDate, isSelected, isSelectionStart, isSelectionEnd }) => (
+      {({ formattedDate, isSelectionStart, isSelectionEnd }) => (
         <span
           className="rc-cell__inner"
           data-today={isTodayDate ? "" : undefined}
-          data-predictive={isPredictive && !isSelected ? "" : undefined}
           data-marked={isSelectionStart || isSelectionEnd ? "" : undefined}
         >
           {formattedDate}
@@ -59,13 +58,17 @@ interface DateRangeChipProps {
   from: string;
   to: string;
   earliestUsageAt: string | null;
+  availableDates: string[];
   onChange: (from: string, to: string) => void;
 }
 
-export function DateRangeChip({ from, to, earliestUsageAt, onChange }: DateRangeChipProps) {
+export function DateRangeChip({ from, to, earliestUsageAt, availableDates, onChange }: DateRangeChipProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const maxValue = today(getLocalTimeZone()).add({ days: 7 });
+  const availableDaySet = useMemo(() => new Set(availableDates), [availableDates]);
+  const isDateUnavailable = (date: DateValue) => !availableDaySet.has(date.toString());
+  const latestDay = availableDates.at(-1);
+  const maxValue = latestDay ? parseDate(latestDay) : today(getLocalTimeZone());
   const minValue = earliestUsageAt ? parseDate(localDay(earliestUsageAt)) : undefined;
   const value = { start: parseDate(dayFromDateTime(from)), end: parseDate(dayFromDateTime(to)) };
 
@@ -92,6 +95,8 @@ export function DateRangeChip({ from, to, earliestUsageAt, onChange }: DateRange
             value={value}
             minValue={minValue}
             maxValue={maxValue}
+            isDateUnavailable={isDateUnavailable}
+            allowsNonContiguousRanges
             onChange={(range) => {
               if (!range) return;
               onChange(dateTimeWithDay(range.start as CalendarDate, false), dateTimeWithDay(range.end as CalendarDate, true));
@@ -108,12 +113,12 @@ export function DateRangeChip({ from, to, earliestUsageAt, onChange }: DateRange
                 {(day) => <CalendarHeaderCell className="range-grid__weekday">{day}</CalendarHeaderCell>}
               </CalendarGridHeader>
               <CalendarGridBody>
-                {(date) => <RangeCell date={date} maxValue={maxValue} />}
+                {(date) => <RangeCell date={date} />}
               </CalendarGridBody>
             </CalendarGrid>
             <footer className="range-popover__footer">
               <span className="range-popover__legend"><i className="range-popover__dot range-popover__dot--today" /> Today</span>
-              <span className="range-popover__legend"><i className="range-popover__dot range-popover__dot--predictive" /> Future (up to +7d)</span>
+              <span className="range-popover__legend"><i className="range-popover__dot range-popover__dot--unavailable" /> No usage data</span>
             </footer>
           </RangeCalendar>
         </div>
