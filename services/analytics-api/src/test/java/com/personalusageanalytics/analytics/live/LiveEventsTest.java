@@ -16,7 +16,7 @@ class LiveEventsTest {
     void excludesHiddenAppsBeforeAnonymizing() {
         for (boolean anonymous : new boolean[] {false, true}) {
             assertNull(LiveEvents.fromNotification(
-                    "{\"kind\":\"OPEN\",\"app\":\"  gRiNdR  \",\"deviceId\":\"iPhone 16 Pro\"}",
+                    "{\"kind\":\"OPEN\",\"app\":\"  private-test  \",\"deviceId\":\"iPhone 16 Pro\"}",
                     jsonMapper, app -> { throw new AssertionError("Hidden icons must not be loaded"); }, anonymous));
         }
     }
