@@ -1,6 +1,9 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApiCloudArt, DashboardArt, DatabaseArt, KafkaArt, PhoneArt, WorkerArt } from "./PipelineArt";
 import { AppIcon } from "./AppIcon";
+import { loadPipelineEvents, type StoredPipelineEvent } from "./api";
+import { PipelineActivity } from "./PipelineActivity";
+import { isVisibleActivity } from "./visibility";
 import { type LiveEvent, flyToken, liveEventLabel } from "./liveFlow";
 
 type LayerKind = "phone" | "api" | "broker" | "processor" | "database" | "dashboard";
@@ -9,7 +12,7 @@ type PipelineStep = { id: string; label: string; title: string; detail: string; 
 
 // Flow order: numbered 1-7 on the diagram.
 const steps: PipelineStep[] = [
-  { id: "capture", label: "Capture", title: "iPhone Shortcut", detail: "An automation records an OPEN or CLOSE event with the app, device, and timestamp.", event: "OPEN · CLOSE", kind: "phone", tier: "source" },
+  { id: "capture", label: "Capture", title: "iPhone Shortcut", detail: "An automation records the device and timestamp. OPEN identifies the app; CLOSE completes the device's active sessions.", event: "OPEN · CLOSE", kind: "phone", tier: "source" },
   { id: "ingest", label: "Validate", title: "Ingestion API", detail: "A Spring Boot HTTP API that Chris's iPhone Shortcut calls. It checks the collector token, validates the versioned event contract, and publishes the event to Kafka.", event: "authenticated JSON", kind: "api", tier: "backend", lane: "write" },
   { id: "stream", label: "Buffer", title: "Kafka", detail: "Kafka keeps every event durable in a partitioned log, keyed by device so each phone's events stay in order while processing catches up.", event: "device-keyed event", kind: "broker", tier: "backend", lane: "write" },
   { id: "transform", label: "Transform", title: "Stream processor", detail: "A Spring Boot background worker with no HTTP API: nothing calls it. It pulls events from Kafka, pairs opens and closes into sessions in plain Java, and writes events, sessions and time rollups to TimescaleDB.", event: "session · rollup", kind: "processor", tier: "backend", lane: "write" },
@@ -191,19 +194,49 @@ export function Pipeline() {
   const node = (id: string) => <Node step={step(id)} selectedId={selectedId} onSelect={setSelectedId} register={register} />;
   const [tokens, setTokens] = useState<{ id: number; event: LiveEvent }[]>([]);
   const [lastEvent, setLastEvent] = useState<LiveEvent | null>(null);
+  const [recentEvents, setRecentEvents] = useState<StoredPipelineEvent[] | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [connection, setConnection] = useState("Connecting to live activity");
   const removeToken = useCallback((id: number) => setTokens((current) => current.filter((token) => token.id !== id)), []);
 
   useEffect(() => {
-    if (typeof EventSource === "undefined") return;
+    const controller = new AbortController();
+    let loading = false;
+    let refreshTimer = 0;
+    const refresh = async () => {
+      if (loading || controller.signal.aborted) return;
+      loading = true;
+      try {
+        const events = await loadPipelineEvents(controller.signal);
+        if (!controller.signal.aborted) { setRecentEvents(events); setHistoryError(null); }
+      } catch {
+        if (!controller.signal.aborted) setHistoryError("Recent activity could not be refreshed.");
+      } finally { loading = false; }
+    };
+    void refresh();
+    // Recover stored events after reloads, missed notifications, or stream outages.
+    const poll = window.setInterval(() => void refresh(), 15_000);
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const source = new EventSource("/api/v1/live");
+    const source = typeof EventSource === "undefined" ? null : new EventSource("/api/v1/live");
     let next = 0;
-    source.addEventListener("pipeline", (message) => {
-      const event = JSON.parse((message as MessageEvent<string>).data) as LiveEvent;
+    source?.addEventListener("open", () => { setConnection("Live activity connected"); void refresh(); });
+    source?.addEventListener("error", () => setConnection("Reconnecting · stored activity refreshes automatically"));
+    source?.addEventListener("pipeline", (message) => {
+      let event: LiveEvent;
+      try { event = JSON.parse((message as MessageEvent<string>).data) as LiveEvent; } catch { return; }
+      if (!isVisibleActivity(event)) return;
       setLastEvent(event);
       if (!reduceMotion) setTokens((current) => [...current.slice(-4), { id: next++, event }]);
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void refresh(), 400);
     });
-    return () => source.close();
+    if (!source) setConnection("Stored activity refreshes automatically");
+    return () => {
+      controller.abort(); source?.close(); window.clearInterval(poll); window.clearTimeout(refreshTimer);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -228,7 +261,7 @@ export function Pipeline() {
 
   return <section id="pipeline" className="pipeline-page" aria-label="Data pipeline">
     <header className="pipeline-intro">
-      <p className="pipeline-live" aria-live="polite"><i aria-hidden="true" />{lastEvent ? `Live phone usage · ${liveEventLabel(lastEvent)}` : "Live phone usage · watch Chris's iPhone activity update in real time"}</p>
+      <p className="pipeline-live" aria-live="polite"><i aria-hidden="true" />{lastEvent ? `${connection} · ${liveEventLabel(lastEvent)}` : connection}</p>
     </header>
 
     <section className="arch" ref={archRef} aria-label="Usage data architecture">
@@ -258,5 +291,6 @@ export function Pipeline() {
       <span className="pipeline-inspector__event">{selected.event}</span>
     </section>
 
+    <PipelineActivity events={recentEvents} error={historyError} />
   </section>;
 }
