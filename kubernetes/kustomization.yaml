@@ -8,4 +8,5 @@ resources:
   - timescaledb-close-events-migration.yaml
   - timescaledb-app-icons-migration.yaml
   - timescaledb-pipeline-notify-migration.yaml
+  - timescaledb-app-privacy-migration.yaml
   - dashboard.yaml

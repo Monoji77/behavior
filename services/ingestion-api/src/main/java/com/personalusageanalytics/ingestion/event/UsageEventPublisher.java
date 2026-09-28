@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.personalusageanalytics.ingestion.config.IngestionProperties;
+import com.personalusageanalytics.ingestion.privacy.AppExclusions;
 
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class UsageEventPublisher {
     }
 
     public void publish(UsageEventRequest event) {
+        if (AppExclusions.isExcluded(event.app())) return;
         UsageEventRequest normalizedEvent = event.normalizedToMilliseconds();
 
         try {
