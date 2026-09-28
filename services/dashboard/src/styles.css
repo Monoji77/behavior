@@ -22,6 +22,7 @@
 .range-grid__weekday{color:var(--faint);font-size:.6rem;font-weight:700;height:1.3rem;padding:0;text-align:center}
 .rc-cell{cursor:pointer;padding:0;position:relative;text-align:center}
 .rc-cell--disabled{cursor:not-allowed;opacity:.3}
+.rc-cell--unavailable{cursor:not-allowed}
 .rc-cell--outside{visibility:hidden}
 .rc-cell--selected{background:var(--accent-soft)}
 .rc-cell--start{border-radius:.5rem 0 0 .5rem}
@@ -29,17 +30,17 @@
 .rc-cell--start.rc-cell--end{border-radius:.5rem}
 .rc-cell--focus{outline:2px solid var(--accent-bright);outline-offset:-2px}
 .rc-cell__inner{align-items:center;border-radius:.5rem;color:var(--text);display:flex;font-size:.72rem;height:1.9rem;justify-content:center;position:relative;transition:background .16s ease,color .16s ease}
-.rc-cell:not(.rc-cell--disabled):hover .rc-cell__inner{background:var(--accent-soft);color:var(--accent-bright)}
+.rc-cell:not(.rc-cell--disabled):not(.rc-cell--unavailable):hover .rc-cell__inner{background:var(--accent-soft);color:var(--accent-bright)}
 .rc-cell__inner[data-today]{color:var(--blue);font-weight:800}
-.rc-cell__inner[data-predictive]{background:var(--purple-predictive-soft);color:var(--purple-predictive)}
 .rc-cell--start .rc-cell__inner,.rc-cell--end .rc-cell__inner{background:var(--accent);color:#fff;font-weight:700}
+.rc-cell--unavailable .rc-cell__inner{color:var(--faint);opacity:.35;text-decoration:line-through}
 .rc-cell__today-dot{background:var(--blue);border-radius:50%;bottom:.2rem;height:.26rem;left:50%;position:absolute;transform:translateX(-50%);width:.26rem}
 .rc-cell--start .rc-cell__today-dot,.rc-cell--end .rc-cell__today-dot{background:#fff}
 .range-popover__footer{border-top:1px solid var(--line);color:var(--muted);display:flex;font-size:.68rem;gap:.9rem;margin-top:.7rem;padding-top:.65rem}
 .range-popover__legend{align-items:center;display:flex;gap:.35rem}
 .range-popover__dot{border-radius:50%;display:inline-block;height:.5rem;width:.5rem}
 .range-popover__dot--today{background:var(--blue)}
-.range-popover__dot--predictive{background:var(--purple-predictive)}
+.range-popover__dot--unavailable{background:var(--faint)}
 @media(max-width:620px){
   .activity .trend-panel>header{align-items:stretch;flex-direction:column}
   .activity .rollup-controls{position:relative}
