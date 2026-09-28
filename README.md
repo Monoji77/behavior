@@ -39,14 +39,12 @@ Everything above is one identical code path for two environments — see
 | **Analytics API** | Read-only. Serves the dashboard's metrics over REST, and streams live activity over Server-Sent Events (fed by a Postgres `LISTEN/NOTIFY` the stream processor triggers). |
 | **Dashboard** | React + TypeScript, served by nginx. Usage charts, session history, and an animated diagram of the pipeline itself. |
 
-The Pipeline page also loads the latest 30 stored OPEN/CLOSE events, including
-their event and storage timestamps, and refreshes them as activity arrives.
+The Pipeline page shows one current app session beside its live connection indicator.
+The newest active session takes priority and shows its opening date and time;
+otherwise the most recently closed session shows usage duration and closing date
+and time. This status is restored from the database on reload and refreshes on
+live notifications, every 15 seconds, and when the browser regains focus.
 Daily Summary presents today's top three apps on an animated, interactive podium.
-Both summary views show recent activity: the newest active session takes priority,
-otherwise the latest completed session by closing time appears. Active activity
-shows its opening date and time; completed activity shows duration and closing
-time. Summaries refresh on live activity, every 15 seconds as a fallback, and when
-the browser regains focus.
 Select a pedestal to open that app's summary. Excluded apps and test or diagnostic
 entries stay out of dashboard analytics, selectors, icons, and live activity.
 Excluded app events are discarded before Kafka publishing and during replay.

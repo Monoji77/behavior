@@ -18,7 +18,7 @@ import com.personalusageanalytics.analytics.model.TopApp;
 import com.personalusageanalytics.analytics.model.AppUsageTotal;
 import com.personalusageanalytics.analytics.model.DashboardVisibility;
 import com.personalusageanalytics.analytics.model.StoredPipelineEvent;
-import com.personalusageanalytics.analytics.model.RecentActivity;
+import com.personalusageanalytics.analytics.model.CurrentActivity;
 import java.util.Arrays;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,7 +42,7 @@ public class AnalyticsRepository {
 
     // Current activity outranks completed usage, even when it opened earlier.
     // A completed fallback is ordered by closing time, not opening time.
-    private static final String FIND_RECENT_ACTIVITY = """
+    private static final String FIND_CURRENT_ACTIVITY = """
             SELECT activity.device_id, activity.app, icons.icon_url, activity.status,
                    activity.opened_at, activity.closed_at, activity.duration_milliseconds
             FROM (
@@ -56,8 +56,7 @@ public class AnalyticsRepository {
                            1 AS priority
                     FROM %s WHERE status = 'COMPLETED' AND closed_at IS NOT NULL
                 ) candidates
-                WHERE device_id = ? AND (?::text IS NULL OR app = ?)
-                ORDER BY priority, COALESCE(closed_at, opened_at) DESC, opened_at DESC, app ASC
+                ORDER BY priority, COALESCE(closed_at, opened_at) DESC, opened_at DESC, app ASC, device_id ASC
                 LIMIT 1
             ) activity
             LEFT JOIN %s icons ON icons.app = activity.app
@@ -299,15 +298,15 @@ public class AnalyticsRepository {
                 .stream().findFirst();
     }
 
-    public Optional<RecentActivity> findRecentActivity(String deviceId, String app) {
-        return jdbcTemplate.query(FIND_RECENT_ACTIVITY, (row, index) -> {
+    public Optional<CurrentActivity> findCurrentActivity() {
+        return jdbcTemplate.query(FIND_CURRENT_ACTIVITY, (row, index) -> {
             Timestamp closedAt = row.getTimestamp("closed_at");
-            return new RecentActivity(row.getString("device_id"), row.getString("app"),
+            return new CurrentActivity(row.getString("device_id"), row.getString("app"),
                     row.getString("icon_url"), row.getString("status"),
                     row.getTimestamp("opened_at").toInstant(),
                     closedAt == null ? null : closedAt.toInstant(),
                     row.getObject("duration_milliseconds", Long.class));
-        }, deviceId, app, app).stream().findFirst();
+        }).stream().findFirst();
     }
 
     // Longest completed session opened within [from, to).

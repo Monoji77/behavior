@@ -33,7 +33,6 @@ export interface DashboardData {
   rollups: UsageRollup[];
   topApps: TopApp[];
   pastWeekMilliseconds: number;
-  recentActivity: RecentActivity | null;
 }
 
 export interface FilterOptions {
@@ -73,17 +72,9 @@ export async function loadPipelineEvents(signal?: AbortSignal): Promise<StoredPi
   return events.filter(isVisibleActivity).map((event) => ({ ...event, closedApps: event.closedApps.filter(isVisibleApp) }));
 }
 
-export interface BehaviorSummary {
-  totalUsageMilliseconds: number;
-  appCount: number;
-  categories: CategoryUsage[];
-  topApps: TopApp[];
-  recentActivity: RecentActivity | null;
-}
-
-export interface RecentActivity {
-  deviceId: string;
-  app: string;
+export interface CurrentActivity {
+  deviceId: string | null;
+  app: string | null;
   iconUrl: string | null;
   status: "ACTIVE" | "COMPLETED";
   openedAt: string;
@@ -91,8 +82,16 @@ export interface RecentActivity {
   durationMilliseconds: number | null;
 }
 
-function visibleRecentActivity(activity: RecentActivity | null | undefined): RecentActivity | null {
+export async function loadCurrentActivity(signal?: AbortSignal): Promise<CurrentActivity | null> {
+  const { activity } = await getJson<{ activity: CurrentActivity | null }>("/api/v1/pipeline/current", signal);
   return activity && isVisibleActivity(activity) ? activity : null;
+}
+
+export interface BehaviorSummary {
+  totalUsageMilliseconds: number;
+  appCount: number;
+  categories: CategoryUsage[];
+  topApps: TopApp[];
 }
 
 // A full local calendar day, including the last minute before midnight.
@@ -177,7 +176,6 @@ interface DashboardResponse {
   pastWeekMilliseconds: number;
   longestSession: Session | null;
   topApps: TopApp[];
-  recentActivity?: RecentActivity | null;
 }
 
 export class DashboardApiError extends Error {
@@ -236,7 +234,7 @@ export function behaviorSummaryUrl(deviceId: string, from: string, to: string): 
 
 export async function loadBehaviorSummary(deviceId: string, from: string, to: string, signal?: AbortSignal): Promise<BehaviorSummary> {
   const summary = await getJson<BehaviorSummary>(behaviorSummaryUrl(deviceId, from, to), signal);
-  return { ...summary, topApps: (summary.topApps ?? []).filter((entry) => isVisibleApp(entry.app)).slice(0, 3), recentActivity: visibleRecentActivity(summary.recentActivity) };
+  return { ...summary, topApps: (summary.topApps ?? []).filter((entry) => isVisibleApp(entry.app)).slice(0, 3) };
 }
 
 const RATE_LIMIT_RETRY_MILLISECONDS = 1500;
@@ -261,7 +259,6 @@ export async function loadDashboard(filters: Filters, signal?: AbortSignal): Pro
     longestSession: response.longestSession,
     rollups: response.buckets,
     topApps: response.topApps.filter((entry) => isVisibleApp(entry.app)),
-    pastWeekMilliseconds: response.pastWeekMilliseconds,
-    recentActivity: visibleRecentActivity(response.recentActivity)
+    pastWeekMilliseconds: response.pastWeekMilliseconds
   };
 }

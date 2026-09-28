@@ -13,7 +13,6 @@ import com.personalusageanalytics.analytics.model.AppUsageTotal;
 import com.personalusageanalytics.analytics.model.BehaviorCategory;
 import com.personalusageanalytics.analytics.model.CategoryUsage;
 import com.personalusageanalytics.analytics.model.LatestSession;
-import com.personalusageanalytics.analytics.model.RecentActivity;
 import com.personalusageanalytics.analytics.model.RollupGranularity;
 import com.personalusageanalytics.analytics.model.TopApp;
 import com.personalusageanalytics.analytics.model.UsageRollup;
@@ -130,8 +129,7 @@ public class MetricsController {
                 weekTo,
                 analyticsRepository.findUsageTotal(deviceId, app, weekFrom, weekTo),
                 analyticsRepository.findLongestSession(deviceId, app, weekFrom, weekTo).orElse(null),
-                analyticsRepository.findTopAppsScoredByToday(deviceId, 3),
-                analyticsRepository.findRecentActivity(deviceId, app).orElse(null)
+                analyticsRepository.findTopAppsScoredByToday(deviceId, 3)
         );
     }
 
@@ -181,8 +179,7 @@ public class MetricsController {
         long totalUsageMilliseconds = categories.stream().mapToLong(CategoryUsage::usageMilliseconds).sum();
         int appCount = categories.stream().mapToInt(CategoryUsage::appCount).sum();
         return new BehaviorSummaryResponse(deviceId, from, to, totalUsageMilliseconds, appCount, categories,
-                analyticsRepository.findTopApps(deviceId, from, to, 3),
-                analyticsRepository.findRecentActivity(deviceId, null).orElse(null));
+                analyticsRepository.findTopApps(deviceId, from, to, 3));
     }
 
     private SessionResponse longestSession(
@@ -344,8 +341,7 @@ public class MetricsController {
             Instant weekTo,
             long pastWeekMilliseconds,
             LatestSession longestSession,
-            List<TopApp> topApps,
-            RecentActivity recentActivity
+            List<TopApp> topApps
     ) {
     }
 
@@ -364,8 +360,7 @@ public class MetricsController {
             long totalUsageMilliseconds,
             int appCount,
             List<CategoryUsage> categories,
-            List<TopApp> topApps,
-            RecentActivity recentActivity
+            List<TopApp> topApps
     ) {
     }
 

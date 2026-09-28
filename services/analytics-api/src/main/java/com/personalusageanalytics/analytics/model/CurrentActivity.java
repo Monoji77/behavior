@@ -2,7 +2,7 @@ package com.personalusageanalytics.analytics.model;
 
 import java.time.Instant;
 
-public record RecentActivity(
+public record CurrentActivity(
         String deviceId,
         String app,
         String iconUrl,
@@ -11,4 +11,7 @@ public record RecentActivity(
         Instant closedAt,
         Long durationMilliseconds
 ) {
+    public CurrentActivity anonymized() {
+        return new CurrentActivity(null, null, null, status, openedAt, closedAt, durationMilliseconds);
+    }
 }

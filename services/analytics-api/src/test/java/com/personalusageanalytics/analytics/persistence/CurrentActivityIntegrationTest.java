@@ -21,7 +21,7 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 @Testcontainers
-class RecentActivityIntegrationTest {
+class CurrentActivityIntegrationTest {
     private static final Path ROOT = root();
     @Container
     private static final PostgreSQLContainer<?> DB = database();
@@ -50,7 +50,7 @@ class RecentActivityIntegrationTest {
         active("Phone", "Telegram", "2026-09-27T23:00:00Z");
         closed("Phone", "Netflix", "2026-09-28T08:00:00Z", "2026-09-28T08:05:00Z");
         jdbc.update("INSERT INTO app_icons (app, icon_url, source) VALUES ('Telegram', 'telegram.png', 'manual')");
-        var activity = repository.findRecentActivity("Phone", null).orElseThrow();
+        var activity = repository.findCurrentActivity().orElseThrow();
         assertEquals("Telegram", activity.app());
         assertEquals("ACTIVE", activity.status());
         assertEquals(Instant.parse("2026-09-27T23:00:00Z"), activity.openedAt());
@@ -60,13 +60,15 @@ class RecentActivityIntegrationTest {
     }
 
     @Test
-    void selectsTheNewestVisibleActiveAppAndSupportsAnAppSelection() {
+    void selectsTheNewestVisibleActiveAppAcrossDevices() {
         active("Phone", "Telegram", "2026-09-28T08:00:00Z");
         active("Phone", "Netflix", "2026-09-28T08:01:00Z");
         active("Phone", "postman-test", "2026-09-28T08:05:00Z");
-        active("Other phone", "Calendar", "2026-09-28T08:06:00Z");
-        assertEquals("Netflix", repository.findRecentActivity("Phone", null).orElseThrow().app());
-        assertEquals("Telegram", repository.findRecentActivity("Phone", "Telegram").orElseThrow().app());
+        active("Other phone", "Calendar", "2026-09-28T07:06:00Z");
+        assertEquals("Netflix", repository.findCurrentActivity().orElseThrow().app());
+        active("Other phone", "Discord", "2026-09-28T08:10:00Z");
+        assertEquals("Other phone", repository.findCurrentActivity().orElseThrow().deviceId());
+
     }
 
     @Test
@@ -75,21 +77,21 @@ class RecentActivityIntegrationTest {
         closed("Phone", "Telegram", "2026-09-28T08:10:00Z", "2026-09-28T08:15:00Z");
         closed("Phone", "postman-test", "2026-09-28T09:00:00Z", "2026-09-28T09:05:00Z");
         jdbc.update("INSERT INTO app_usage_sessions (session_id, device_id, app, source, open_event_id, opened_at, status) VALUES (gen_random_uuid(), 'Phone', 'Calendar', 'Shortcut', gen_random_uuid(), '2026-09-28T10:00:00Z', 'ABANDONED')");
-        var activity = repository.findRecentActivity("Phone", null).orElseThrow();
+        var activity = repository.findCurrentActivity().orElseThrow();
         assertEquals("Netflix", activity.app());
         assertEquals("COMPLETED", activity.status());
         assertEquals(Instant.parse("2026-09-28T08:30:00Z"), activity.closedAt());
         assertEquals(1_800_000L, activity.durationMilliseconds());
-        assertEquals("Telegram", repository.findRecentActivity("Phone", "Telegram").orElseThrow().app());
+
     }
 
     @Test
-    void returnsNoActivityForDevicesWithoutVisibleSessionsAndPreservesZeroDurations() {
+    void returnsNoActivityWithoutVisibleSessionsAndPreservesZeroDurations() {
+        assertTrue(repository.findCurrentActivity().isEmpty());
         active("diagnostic-phone", "Telegram", "2026-09-28T08:00:00Z");
-        assertTrue(repository.findRecentActivity("diagnostic-phone", null).isEmpty());
-        assertTrue(repository.findRecentActivity("Phone", null).isEmpty());
+        assertTrue(repository.findCurrentActivity().isEmpty());
         closed("Phone", "Netflix", "2026-09-28T08:00:00Z", "2026-09-28T08:00:00Z");
-        assertEquals(0L, repository.findRecentActivity("Phone", null).orElseThrow().durationMilliseconds());
+        assertEquals(0L, repository.findCurrentActivity().orElseThrow().durationMilliseconds());
     }
 
     private void active(String device, String app, String opened) {

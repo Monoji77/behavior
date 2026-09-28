@@ -18,7 +18,6 @@ import java.util.Map;
 import com.personalusageanalytics.analytics.model.RollupGranularity;
 import com.personalusageanalytics.analytics.model.UsageRollup;
 import com.personalusageanalytics.analytics.model.LatestSession;
-import com.personalusageanalytics.analytics.model.RecentActivity;
 import com.personalusageanalytics.analytics.model.TopApp;
 import com.personalusageanalytics.analytics.model.AppUsageTotal;
 import com.personalusageanalytics.analytics.model.BehaviorCategory;
@@ -43,28 +42,6 @@ class MetricsControllerTest {
 
         @MockitoBean
         private AppCategoryClassifier appCategoryClassifier;
-
-        @Test
-        void dailySummaryIncludesDeviceWideActiveSession() throws Exception {
-                when(analyticsRepository.findRecentActivity("Phone", null)).thenReturn(Optional.of(
-                        new RecentActivity("Phone", "Telegram", null, "ACTIVE", Instant.parse("2026-09-28T08:00:00Z"), null, null)));
-                mockMvc.perform(get("/api/v1/metrics/behavior-summary").param("deviceId", "Phone")
-                                .param("from", "2026-09-27T16:00:00Z").param("to", "2026-09-28T16:00:00Z"))
-                        .andExpect(status().isOk()).andExpect(jsonPath("$.recentActivity.status").value("ACTIVE"))
-                        .andExpect(jsonPath("$.recentActivity.openedAt").value("2026-09-28T08:00:00Z"))
-                        .andExpect(jsonPath("$.recentActivity.closedAt").value(nullValue()));
-        }
-
-        @Test
-        void appSummaryIncludesSelectedAppsCompletedSession() throws Exception {
-                when(analyticsRepository.findRecentActivity("Phone", "Telegram")).thenReturn(Optional.of(
-                        new RecentActivity("Phone", "Telegram", null, "COMPLETED", Instant.parse("2026-09-28T08:00:00Z"), Instant.parse("2026-09-28T08:02:00Z"), 120000L)));
-                mockMvc.perform(get("/api/v1/metrics/dashboard").param("deviceId", "Phone").param("app", "Telegram")
-                                .param("granularity", "HOUR").param("from", "2026-09-27T16:00:00Z").param("to", "2026-09-28T16:00:00Z"))
-                        .andExpect(status().isOk()).andExpect(jsonPath("$.recentActivity.status").value("COMPLETED"))
-                        .andExpect(jsonPath("$.recentActivity.durationMilliseconds").value(120000))
-                        .andExpect(jsonPath("$.recentActivity.closedAt").value("2026-09-28T08:02:00Z"));
-        }
 
         @Test
         void groupsAllAppUsageIntoNaturalBehaviorCategories() throws Exception {
