@@ -41,9 +41,12 @@ Everything above is one identical code path for two environments — see
 
 The Pipeline page also loads the latest 30 stored OPEN/CLOSE events, including
 their event and storage timestamps, and refreshes them as activity arrives.
-Daily Summary shows today's top three apps by tracked usage. Grindr and test or
-diagnostic devices/apps are excluded from dashboard analytics, selectors,
-icons, and live activity; retained or replayed records cannot make them visible.
+Daily Summary presents today's top three apps on an animated, interactive podium.
+Select a pedestal to open that app's summary. Excluded apps and test or diagnostic
+entries stay out of dashboard analytics, selectors, icons, and live activity.
+Excluded app events are discarded before Kafka publishing and during replay.
+Database guards purge and prevent matching raw events, sessions, rollups,
+anomalies, and icons. Current source and assets use normalized name fingerprints.
 
 ## Staging and production
 
