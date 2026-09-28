@@ -1,10 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appFingerprint, isExcludedApp, isVisibleActivity, isVisibleApp, isVisibleIdentifier } from "./visibility";
-import { dailyRange, loadBehaviorSummary, loadFilterOptions, loadPipelineEvents } from "./api";
+import { dailyRange, loadBehaviorSummary, loadCurrentActivity, loadFilterOptions, loadPipelineEvents } from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("dashboard exclusions", () => {
+  it("loads one current session and rejects diagnostic sessions from stale responses", async () => {
+    const activity = { app: "Telegram", deviceId: "Phone", status: "ACTIVE", openedAt: "2026-09-28T08:00:00Z", closedAt: null, durationMilliseconds: null, iconUrl: null };
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ activity })));
+    vi.stubGlobal("fetch", fetch);
+    expect(await loadCurrentActivity()).toEqual(activity);
+    expect(fetch.mock.calls[0][0]).toBe("/api/v1/pipeline/current");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ activity: { ...activity, app: "private-test" } }))));
+    expect(await loadCurrentActivity()).toBeNull();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ activity: null }))));
+    expect(await loadCurrentActivity()).toBeNull();
+  });
   it("requests the entire local day across a month boundary", () => {
     expect(dailyRange(new Date(2026, 8, 30, 23, 59))).toEqual({ from: "2026-09-30T00:00", to: "2026-10-01T00:00" });
   });

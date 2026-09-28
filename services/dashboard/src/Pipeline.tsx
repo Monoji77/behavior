@@ -1,10 +1,10 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApiCloudArt, DashboardArt, DatabaseArt, KafkaArt, PhoneArt, WorkerArt } from "./PipelineArt";
 import { AppIcon } from "./AppIcon";
-import { loadPipelineEvents, type StoredPipelineEvent } from "./api";
-import { PipelineActivity } from "./PipelineActivity";
+import { loadCurrentActivity, type CurrentActivity } from "./api";
+import { PipelineSession } from "./PipelineSession";
 import { isVisibleActivity } from "./visibility";
-import { type LiveEvent, flyToken, liveEventLabel } from "./liveFlow";
+import { type LiveEvent, flyToken } from "./liveFlow";
 
 type LayerKind = "phone" | "api" | "broker" | "processor" | "database" | "dashboard";
 type Tier = "source" | "backend" | "database" | "client";
@@ -193,9 +193,9 @@ export function Pipeline() {
   const register = useCallback((id: string, element: HTMLElement | null) => { if (element) visuals.current.set(id, element); else visuals.current.delete(id); }, []);
   const node = (id: string) => <Node step={step(id)} selectedId={selectedId} onSelect={setSelectedId} register={register} />;
   const [tokens, setTokens] = useState<{ id: number; event: LiveEvent }[]>([]);
-  const [lastEvent, setLastEvent] = useState<LiveEvent | null>(null);
-  const [recentEvents, setRecentEvents] = useState<StoredPipelineEvent[] | null>(null);
-  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<CurrentActivity | null>(null);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const [connection, setConnection] = useState("Connecting to live activity");
   const removeToken = useCallback((id: number) => setTokens((current) => current.filter((token) => token.id !== id)), []);
 
@@ -207,14 +207,14 @@ export function Pipeline() {
       if (loading || controller.signal.aborted) return;
       loading = true;
       try {
-        const events = await loadPipelineEvents(controller.signal);
-        if (!controller.signal.aborted) { setRecentEvents(events); setHistoryError(null); }
+        const current = await loadCurrentActivity(controller.signal);
+        if (!controller.signal.aborted) { setActivity(current); setActivityError(null); }
       } catch {
-        if (!controller.signal.aborted) setHistoryError("Recent activity could not be refreshed.");
-      } finally { loading = false; }
+        if (!controller.signal.aborted) setActivityError("Activity could not be refreshed. Retrying automatically.");
+      } finally { loading = false; if (!controller.signal.aborted) setActivityLoading(false); }
     };
     void refresh();
-    // Recover stored events after reloads, missed notifications, or stream outages.
+    // Recover the current session after reloads, missed notifications, or stream outages.
     const poll = window.setInterval(() => void refresh(), 15_000);
     const onFocus = () => void refresh();
     window.addEventListener("focus", onFocus);
@@ -227,7 +227,6 @@ export function Pipeline() {
       let event: LiveEvent;
       try { event = JSON.parse((message as MessageEvent<string>).data) as LiveEvent; } catch { return; }
       if (!isVisibleActivity(event)) return;
-      setLastEvent(event);
       if (!reduceMotion) setTokens((current) => [...current.slice(-4), { id: next++, event }]);
       window.clearTimeout(refreshTimer);
       refreshTimer = window.setTimeout(() => void refresh(), 400);
@@ -261,7 +260,7 @@ export function Pipeline() {
 
   return <section id="pipeline" className="pipeline-page" aria-label="Data pipeline">
     <header className="pipeline-intro">
-      <p className="pipeline-live" aria-live="polite"><i aria-hidden="true" />{lastEvent ? `${connection} · ${liveEventLabel(lastEvent)}` : connection}</p>
+      <div className="pipeline-live" aria-live="polite" aria-atomic="true"><span className="pipeline-live__connection"><i aria-hidden="true" />{connection}</span><PipelineSession activity={activity} loading={activityLoading} />{activityError && <small role="status">{activityError}</small>}</div>
     </header>
 
     <section className="arch" ref={archRef} aria-label="Usage data architecture">
@@ -291,6 +290,5 @@ export function Pipeline() {
       <span className="pipeline-inspector__event">{selected.event}</span>
     </section>
 
-    <PipelineActivity events={recentEvents} error={historyError} />
   </section>;
 }
