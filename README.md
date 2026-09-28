@@ -39,6 +39,12 @@ Everything above is one identical code path for two environments — see
 | **Analytics API** | Read-only. Serves the dashboard's metrics over REST, and streams live activity over Server-Sent Events (fed by a Postgres `LISTEN/NOTIFY` the stream processor triggers). |
 | **Dashboard** | React + TypeScript, served by nginx. Usage charts, session history, and an animated diagram of the pipeline itself. |
 
+The Pipeline page also loads the latest 30 stored OPEN/CLOSE events, including
+their event and storage timestamps, and refreshes them as activity arrives.
+Daily Summary shows today's top three apps by tracked usage. Grindr and test or
+diagnostic devices/apps are excluded from dashboard analytics, selectors,
+icons, and live activity; retained or replayed records cannot make them visible.
+
 ## Staging and production
 
 Every merge to `main` deploys automatically to **staging**. Shipping to

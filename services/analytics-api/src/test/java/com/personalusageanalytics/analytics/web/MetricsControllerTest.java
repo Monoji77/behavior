@@ -54,6 +54,10 @@ class MetricsControllerTest {
                 when(appCategoryClassifier.classify("Instagram")).thenReturn(BehaviorCategory.SOCIAL_AND_ENTERTAINMENT);
                 when(appCategoryClassifier.classify("Netflix")).thenReturn(BehaviorCategory.SOCIAL_AND_ENTERTAINMENT);
                 when(appCategoryClassifier.classify("Telegram")).thenReturn(BehaviorCategory.COMMUNICATION);
+                when(analyticsRepository.findTopApps("iPhone 16 Pro", from, to, 3)).thenReturn(List.of(
+                                new TopApp("Instagram", 50_000L, null),
+                                new TopApp("Telegram", 30_000L, null),
+                                new TopApp("Netflix", 20_000L, null)));
 
                 mockMvc.perform(get("/api/v1/metrics/behavior-summary")
                                 .param("deviceId", "iPhone 16 Pro")
@@ -65,7 +69,10 @@ class MetricsControllerTest {
                                 .andExpect(jsonPath("$.categories[0].category").value("Social & Entertainment"))
                                 .andExpect(jsonPath("$.categories[0].usageMilliseconds").value(70_000))
                                 .andExpect(jsonPath("$.categories[0].appCount").value(2))
-                                .andExpect(jsonPath("$.categories[1].category").value("Communication"));
+                                .andExpect(jsonPath("$.categories[1].category").value("Communication"))
+                                .andExpect(jsonPath("$.topApps.length()").value(3))
+                                .andExpect(jsonPath("$.topApps[0].app").value("Instagram"))
+                                .andExpect(jsonPath("$.topApps[1].usageMilliseconds").value(30_000));
         }
 
         @Test
