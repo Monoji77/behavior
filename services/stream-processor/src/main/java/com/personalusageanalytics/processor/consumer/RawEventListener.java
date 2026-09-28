@@ -1,7 +1,8 @@
 package com.personalusageanalytics.processor.consumer;
 
 import com.personalusageanalytics.processor.event.RawUsageEvent;
-import  com.personalusageanalytics.processor.service.SessionizationService;
+import com.personalusageanalytics.processor.service.SessionizationService;
+import com.personalusageanalytics.processor.privacy.AppExclusions;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -19,6 +20,8 @@ public class RawEventListener {
     @KafkaListener(topics = "#{@rawEventTopics}")
     public void persist(ConsumerRecord<String, RawUsageEvent> record) {
         RawUsageEvent event = record.value();
+        // Acknowledge excluded replays without persisting or dead-lettering them.
+        if (AppExclusions.isExcluded(event.app())) return;
 
         if (!event.deviceId().equals(record.key())) {
             throw new IllegalArgumentException("Kafka key does not match event deviceId");
