@@ -17,11 +17,11 @@ export function DailyTopApps({ apps, onSelect }: { apps: TopApp[] | undefined; o
               <span className="app-podium__icon"><AppIcon app={app.app} url={app.iconUrl} size={52} /></span>
               <strong>{app.app}</strong><span className="app-podium__usage">{formatDuration(app.usageMilliseconds)}</span>
             </span>
-            <span className="app-podium__pedestal" aria-hidden="true"><span className="app-podium__number">{index + 1}</span><span className="app-podium__action">Explore <span>↗</span></span></span>
+            <span className="app-podium__pedestal" aria-hidden="true"><span className="app-podium__number">{index + 1}</span></span>
           </button>
         </li>)}
       </ol>
-      <p className="app-podium__hint">Select a pedestal to explore that app.</p>
+      <p className="app-podium__hint">Select a pedestal to view that app's summary.</p>
     </>}
   </section>;
 }
