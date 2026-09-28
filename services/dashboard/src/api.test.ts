@@ -109,9 +109,9 @@ describe("selectedAppRank", () => {
 });
 
 describe("defaultDateRange", () => {
-  it("shows the last 3 days ending on the latest day with data", () => {
+  it("starts on a recorded day within the last 3 calendar days", () => {
     expect(defaultDateRange(["2026-09-17", "2026-09-20", "2026-09-22", "2026-09-23"]))
-      .toEqual({ from: "2026-09-21T00:00", to: "2026-09-23T23:59" });
+      .toEqual({ from: "2026-09-22T00:00", to: "2026-09-23T23:59" });
   });
 
   it("shows every day when the data spans fewer than 3 days", () => {
@@ -120,7 +120,7 @@ describe("defaultDateRange", () => {
   });
 
   it("crosses month boundaries and handles no data", () => {
-    expect(defaultDateRange(["2026-09-28", "2026-10-01"])).toEqual({ from: "2026-09-29T00:00", to: "2026-10-01T23:59" });
+    expect(defaultDateRange(["2026-09-28", "2026-10-01"])).toEqual({ from: "2026-10-01T00:00", to: "2026-10-01T23:59" });
     expect(defaultDateRange([])).toBeNull();
   });
 });
