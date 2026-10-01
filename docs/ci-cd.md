@@ -80,8 +80,9 @@ promotion, check staging, then run it again.
 
 Each environment has its own dashboard URL, and a URL is only ever served by its
 own environment's `dashboard` Service: staging at `https://chris.taildcd567.ts.net/`
-(tailnet only) and production at `https://behavior-dashboard.taildcd567.ts.net/`
-(public). See the Dashboard URLs section of `kubernetes/README.md` for setup.
+(tailnet only) and production at `https://behavior.chrisyong-portfolio.com/`
+(public, via the edge proxy and Tailscale Funnel). See the Dashboard URLs
+section of `kubernetes/README.md` and `hosting/behavior-domain/README.md` for setup.
 
 ## Operations
 
