@@ -24,10 +24,9 @@ route is defined here.
 3. Forward external **TCP 80 and 443** to that Windows LAN address on the same
    ports. Do not forward 8082, 8092, 18080, Argo CD, or database ports.
 4. In Porkbun DNS, replace the parking CNAME for
-   `staging.behavior.chrisyong-portfolio.com` with an `A` record pointing to
-   the public WAN IPv4. Leave `behavior.chrisyong-portfolio.com` unchanged
-   until production promotion. Update the A record if the ISP changes the WAN
-   address, or configure dynamic DNS.
+   `staging.behavior.chrisyong-portfolio.com` with one `A` record pointing to
+   the public WAN IPv4. Its Host field is `staging.behavior`. Leave
+   `behavior.chrisyong-portfolio.com` unchanged until production promotion.
 
 The Windows Wi-Fi network is currently classified as `Public`, so the install
 script adds narrow inbound firewall rules for Caddy on TCP 80 and 443 for that
@@ -52,9 +51,34 @@ prerequisites are in place:
 
 This copies the reviewed config to `C:\ProgramData\BehaviorPublicIngress`,
 creates an automatic Windows service, and allows only Caddy on inbound ports
-80/443. It starts with the staging hostname and staging upstream. Check
+80/443. It starts with the staging hostname and staging upstream.
+
+Enable API access for `chrisyong-portfolio.com` in Porkbun and generate an
+API key scoped to that domain. In the same elevated PowerShell, run:
+
+```powershell
+.\infrastructure\public-ingress\Initialize-PorkbunDns.ps1
+```
+
+Enter the API key and secret API key at the hidden prompts. Do not paste them
+into the script, repository, or chat. The script validates the keys, stores
+them encrypted for this Windows machine under `C:\ProgramData`, restricts the
+file to SYSTEM and Administrators, and registers `BehaviorPorkbunDDNS` to run
+every five minutes as SYSTEM. It updates only the active hostname's one
+existing A record when the public IPv4 changes; it never creates a record or
+switches environments. To run it immediately and inspect the task:
+
+```powershell
+schtasks.exe /Run /TN BehaviorPorkbunDDNS
+Get-ScheduledTaskInfo -TaskName BehaviorPorkbunDDNS
+```
+
+Check
 `https://staging.behavior.chrisyong-portfolio.com/healthz` and then review the
-dashboard. A normal `200` and `ok` indicate the proxy reached staging.
+dashboard from a connection outside the home network, such as cellular data.
+A normal `200` and `ok` indicate the proxy reached staging. If HTTPS fails,
+confirm the router's WAN IPv4 matches Porkbun's A record and TCP 80/443 reach
+the Windows machine.
 
 To inspect the service:
 
@@ -66,14 +90,16 @@ Get-NetTCPConnection -State Listen -LocalPort 80,443
 ## Promote after staging approval
 
 Change the Porkbun `behavior` record from its parking CNAME to an `A` record
-for the public WAN IPv4. Run this from an **elevated PowerShell**:
+for the public WAN IPv4. Its Host field is `behavior`. Run this from an
+**elevated PowerShell**:
 
 ```powershell
 .\infrastructure\public-ingress\Set-Environment.ps1 -Environment production
 ```
 
 The script validates the config, selects the production hostname and upstream,
-and restarts Caddy. Check
+and restarts Caddy. The DDNS task will now monitor the production A record;
+run it immediately if needed. Check
 `https://behavior.chrisyong-portfolio.com/healthz` and then the dashboard.
 The existing public Tailscale Funnel URL remains available independently.
 
