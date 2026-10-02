@@ -1,3 +1,9 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('staging', 'production')]
+    [string]$Environment
+)
+
 $ErrorActionPreference = 'Stop'
 
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -20,7 +26,7 @@ New-Item -ItemType Directory -Path $install -Force | Out-Null
 $caddy = Join-Path $install 'caddy.exe'
 Copy-Item -LiteralPath $downloadedCaddy -Destination $caddy
 Copy-Item -LiteralPath (Join-Path $source 'Caddyfile') -Destination (Join-Path $install 'Caddyfile')
-Copy-Item -LiteralPath (Join-Path $source 'staging.env.example') -Destination (Join-Path $install 'active.env')
+Copy-Item -LiteralPath (Join-Path $source "$Environment.env.example") -Destination (Join-Path $install 'active.env')
 
 $config = Join-Path $install 'Caddyfile'
 $envFile = Join-Path $install 'active.env'

@@ -1,6 +1,6 @@
-{$BEHAVIOR_DOMAIN:staging.behavior.chrisyong-portfolio.com} {
+{$BEHAVIOR_DOMAIN:behavior.chrisyong-portfolio.com} {
 	encode zstd gzip
-	reverse_proxy {$BEHAVIOR_UPSTREAM:http://100.123.155.120:8092} {
+	reverse_proxy {$BEHAVIOR_UPSTREAM:http://100.123.155.120:8082} {
 		health_uri /healthz
 		health_interval 30s
 	}

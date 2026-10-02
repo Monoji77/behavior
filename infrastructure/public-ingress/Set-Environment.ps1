@@ -17,7 +17,7 @@ $envFile = Join-Path $install 'active.env'
 $caddy = Join-Path $install 'caddy.exe'
 $selected = Join-Path $PSScriptRoot "$Environment.env.example"
 if (-not (Get-Service -Name BehaviorPublicIngress -ErrorAction SilentlyContinue)) {
-    throw 'Install staging first with Install-Staging.ps1.'
+    throw 'Install ingress first with Install-Ingress.ps1.'
 }
 
 $previous = Get-Content -LiteralPath $envFile -Raw

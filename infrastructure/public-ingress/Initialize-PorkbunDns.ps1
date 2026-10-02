@@ -7,7 +7,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 
 $install = Join-Path $env:ProgramData 'BehaviorPublicIngress'
 if (-not (Test-Path -LiteralPath (Join-Path $install 'active.env'))) {
-    throw 'Install staging first with Install-Staging.ps1.'
+    throw 'Install ingress first with Install-Ingress.ps1.'
 }
 $sourceScript = Join-Path $PSScriptRoot 'Update-PorkbunDns.ps1'
 if (-not (Test-Path -LiteralPath $sourceScript)) {
