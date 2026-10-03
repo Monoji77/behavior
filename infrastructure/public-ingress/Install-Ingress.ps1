@@ -30,8 +30,16 @@ Copy-Item -LiteralPath (Join-Path $source "$Environment.env.example") -Destinati
 
 $config = Join-Path $install 'Caddyfile'
 $envFile = Join-Path $install 'active.env'
-& $caddy validate --config $config --envfile $envFile
-if ($LASTEXITCODE -ne 0) { throw 'Caddy config validation failed.' }
+# Caddy writes informational logs to stderr. Windows PowerShell 5.1 can
+# treat those as terminating errors when the caller redirects the streams.
+try {
+    $ErrorActionPreference = 'Continue'
+    & $caddy validate --config $config --envfile $envFile 2>&1 | ForEach-Object { $_.ToString() }
+    $validationExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = 'Stop'
+}
+if ($validationExitCode -ne 0) { throw 'Caddy config validation failed.' }
 
 New-NetFirewallRule -DisplayName 'Behavior public dashboard HTTP' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 80 -Profile Public -Program $caddy | Out-Null
 New-NetFirewallRule -DisplayName 'Behavior public dashboard HTTPS' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 443 -Profile Public -Program $caddy | Out-Null

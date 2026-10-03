@@ -23,8 +23,14 @@ if (-not (Get-Service -Name BehaviorPublicIngress -ErrorAction SilentlyContinue)
 $previous = Get-Content -LiteralPath $envFile -Raw
 try {
     Copy-Item -LiteralPath $selected -Destination $envFile -Force
-    & $caddy validate --config $config --envfile $envFile
-    if ($LASTEXITCODE -ne 0) { throw 'Caddy config validation failed.' }
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $caddy validate --config $config --envfile $envFile 2>&1 | ForEach-Object { $_.ToString() }
+        $validationExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = 'Stop'
+    }
+    if ($validationExitCode -ne 0) { throw 'Caddy config validation failed.' }
     Restart-Service BehaviorPublicIngress
 } catch {
     Set-Content -LiteralPath $envFile -Value $previous -NoNewline
