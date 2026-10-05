@@ -91,6 +91,11 @@ Send test events to `http://<node>:18090/api/v1/events` as in
 
 ### Dashboard URLs
 
+For a WSL host, install the reviewed Windows login launcher described in
+[infrastructure/wsl/README.md](../infrastructure/wsl/README.md). Systemd alone
+does not keep WSL running; a stopped host takes both the services and public
+tunnel offline.
+
 Production and staging each run their own `dashboard` Service, and each URL
 points at exactly one of them:
 
