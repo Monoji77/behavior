@@ -101,8 +101,12 @@ points at exactly one of them:
 
 | URL | Environment | Reaches | Audience |
 |---|---|---|---|
-| `https://behavior-dashboard.taildcd567.ts.net/` | production | `dashboard.behavior` via `tailscale-dashboard-ingress.yaml` (Funnel) | public |
+| `https://behavior.chrisyong-portfolio.com/` | production | Netlify edge proxy to `dashboard.behavior` via `tailscale-dashboard-ingress.yaml` (Funnel) | public |
 | `https://chris.taildcd567.ts.net/` | staging | `dashboard.behavior-staging`, node port 8092 | tailnet only |
+
+The production Funnel URL `https://behavior-dashboard.taildcd567.ts.net/`
+remains the proxy origin and direct fallback. The custom domain is configured
+separately at Netlify and Porkbun; see `hosting/behavior-domain/README.md`.
 
 The staging URL is the k3s node's own Tailscale name, so it is configured on
 the node with `tailscale serve`, not in Kubernetes. Tailscale runs inside WSL

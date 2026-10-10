@@ -51,6 +51,8 @@ jobs:
         run: npm ci --prefix services/dashboard
       - name: Run dashboard tests
         run: npm test --prefix services/dashboard
+      - name: Test custom-domain edge proxy
+        run: node --test hosting/behavior-domain/test/*.test.js
 
   validate:
     name: Validate deployment manifests

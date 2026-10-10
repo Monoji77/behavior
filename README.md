@@ -10,7 +10,7 @@ It started as a single-app (Instagram) proof of concept. It now tracks 40+
 real apps, runs a staging environment that mirrors production, and deploys
 itself through GitOps.
 
-**Live:** https://behavior-dashboard.taildcd567.ts.net/
+**Live:** https://behavior.chrisyong-portfolio.com/
 
 ## How data flows
 
