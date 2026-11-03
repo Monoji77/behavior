@@ -85,6 +85,39 @@ awake, and a network connection. It cannot unlock a pre-boot BitLocker prompt,
 turn on a powered-off laptop, or serve requests while the laptop is asleep.
 The cause of random Windows restarts needs separate investigation.
 
+## Ingestion routing
+
+Production ingestion is exposed by Kubernetes on port **18080**. The old
+local-development target on port 8083 may not be running even when the
+ingestion pod is healthy. A Tailscale route to that stopped target returns 502.
+
+The node's existing tailnet routes are:
+
+| URL | Target |
+| --- | --- |
+| `https://chris.taildcd567.ts.net/` | Staging dashboard, `http://127.0.0.1:8092` |
+| `https://chris.taildcd567.ts.net/api/v1/events` | Production ingestion, `http://127.0.0.1:18080/api/v1/events` |
+| `https://chris.taildcd567.ts.net:8444/api/v1/events` | Production ingestion alias, `http://127.0.0.1:18080/api/v1/events` |
+
+To repair only the ingestion routes from Windows, preserving the staging
+dashboard and other node routes:
+
+```powershell
+wsl.exe -d Ubuntu -u root -- tailscale serve --bg --https=443 --set-path=/api/v1/events http://127.0.0.1:18080/api/v1/events
+wsl.exe -d Ubuntu -u root -- tailscale serve --bg --https=8444 http://127.0.0.1:18080
+wsl.exe -d Ubuntu -u root -- tailscale serve status
+```
+
+Do not use `tailscale serve reset` or enable Funnel on this node. These
+ingestion endpoints remain private to the tailnet. The iPhone must have
+Tailscale connected and send the production collector token.
+
+For a check without creating an event, POST `{}` without a collector token:
+the restored route returns HTTP **401**, rather than 502. With a valid token,
+the same empty payload returns HTTP **400** from event validation. Neither
+request creates an event. Ingestion's actuator health is on its separate
+metrics port 9090; `/actuator/health` on its application port returns 404.
+
 ## Login-only startup (fallback)
 
 This option starts services only after signing in. Run from Windows PowerShell,
