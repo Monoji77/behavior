@@ -1,0 +1,29 @@
+name: Windows WSL startup
+
+on:
+  pull_request:
+    paths:
+      - infrastructure/wsl/**
+      - .github/workflows/wsl-startup.yml
+  push:
+    branches: [main]
+    paths:
+      - infrastructure/wsl/**
+      - .github/workflows/wsl-startup.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify Windows startup policy and installer safeguards
+        shell: powershell
+        run: |
+          Import-Module Pester -RequiredVersion 3.4.0
+          $result = Invoke-Pester -Script .\infrastructure\wsl\BootTask.Tests.ps1 -PassThru
+          if ($result.FailedCount -gt 0 -or $result.TotalCount -eq 0) {
+            throw 'Windows startup tests failed'
+          }
